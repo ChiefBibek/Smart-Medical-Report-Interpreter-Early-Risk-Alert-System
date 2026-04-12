@@ -1,129 +1,233 @@
-# AI-Based Smart Medical Report Interpreter & Early Risk Alert System
+# AI-Based Smart Medical Report Interpreter & Early Risk Detection System
+### Final Year Project — Python ML System
+
+---
+
+## System Overview
+
+A disease-focused AI system that predicts risk for 4 diseases using Logistic Regression
+implemented **FROM SCRATCH** using NumPy only. No sklearn. No pre-built ML libraries.
+
+**4 Supported Diseases:**
+- Anemia
+- Diabetes
+- Infection (Bacterial)
+- Cholesterol (Cardiovascular)
+
+---
 
 ## Project Structure
 
 ```
-medical_risk_system/
-├── ml_model.py              ← Logistic Regression FROM SCRATCH (NumPy only)
-├── preprocessing.py         ← Min-max normalization + reference ranges
-├── risk_engine.py           ← Risk categorization + safety overrides
-├── explainability.py        ← SHAP-like feature contributions (no library)
-├── alerts_recommendations.py ← Rule-based alerts + recommendation engine
-├── ocr_extractor.py         ← PDF/image OCR + regex lab value extraction
-├── train_model.py           ← Synthetic data generation + model training
-├── pipeline.py              ← End-to-end pipeline (all modules connected)
-├── app.py                   ← Streamlit dashboard
-└── requirements.txt
-```
-
-## Setup
-
-```bash
-pip install -r requirements.txt
-
-# Also install Tesseract OCR binary:
-# Ubuntu/Debian: sudo apt-get install tesseract-ocr
-# macOS:         brew install tesseract
-# Windows:       https://github.com/UB-Mannheim/tesseract/wiki
-```
-
-## Run
-
-```bash
-# Step 1: Train the model
-python train_model.py
-
-# Step 2: Run end-to-end demo
-python pipeline.py
-
-# Step 3: Launch Streamlit dashboard
-streamlit run app.py
+medical_ai/
+├── predictor.py              ← MAIN ENTRY POINT (run this)
+├── models/
+│   ├── logistic_regression.py  ← LR from scratch (NumPy only)
+│   └── disease_models.py       ← 4 disease models + safety + explainability
+├── data/
+│   └── data_generator.py       ← Synthetic data generation + metrics
+└── README.md
 ```
 
 ---
 
-## Viva Q&A Preparation
+## Quick Start
 
-### Q: Why not use ChatGPT/LLMs for the core prediction?
-**A:** LLMs are not reproducible, not explainable at the parameter level, and cannot provide
-deterministic risk probabilities. Our logistic regression gives:
-- A precise probability score (0–1)
-- Per-feature weights that explain exactly why a prediction was made
-- Reproducible results — same input always gives same output
-- No hallucination risk
+### 1. Install dependencies (NumPy only required for core ML)
+```bash
+pip install numpy
+pip install flask flask-cors  # Optional: only for API server
+```
 
-### Q: Why use ML instead of pure rules?
-**A:** Rule-based systems only catch known patterns (e.g., hemoglobin < 9).
-ML captures combined, non-linear interactions between features.
-Example: slightly low hemoglobin + slightly elevated WBC + slightly high glucose together
-may signal risk even though each value alone wouldn't trigger a rule.
+### 2. Run demo
+```bash
+cd medical_ai
+python predictor.py
+```
 
-### Q: Where is your ML algorithm?
-**A:**
-- `ml_model.py` — sigmoid, gradient descent, binary cross-entropy, weight updates — all from scratch
-- `preprocessing.py` — min-max normalization from scratch
-- `explainability.py` — SHAP-like contributions: contribution_i = normalized_value_i × weight_i
-
-### Q: What if the prediction is wrong?
-**A:** The system is designed to fail safely:
-1. **Safety layer** (`risk_engine.py`): critical rule-based overrides force High Risk regardless of ML
-2. **Disclaimer**: prominently shown — "not a replacement for medical advice"
-3. **Borderline category**: uncertainty is explicitly communicated
-4. **False positive preference**: thresholds set to catch more cases than miss them
-5. **Recommendations always advise** consulting a doctor
-
-### Q: How does explainability work?
-**A:** For logistic regression: `z = Σ(weight_i × feature_i) + bias`
-Each term (weight_i × feature_i) is that feature's contribution to z.
-We normalize these contributions to percentages and display a ranked bar chart.
-This is mathematically equivalent to SHAP linear explanations — no library required.
-
-### Q: How was the model trained?
-**A:** On synthetically generated data with medically plausible ranges.
-For deployment, real anonymized patient data from labs would be used with IRB approval.
-The synthetic data correctly captures the statistical distributions of each parameter.
-
-### Q: What is your business model?
-**A:**
-- **Primary (B2B):** Sell to labs/clinics on a per-report or subscription basis
-- **Secondary:** Patient-facing mobile app (freemium), hospital API integration
+### 3. Run as Flask API (for .NET backend)
+```bash
+python predictor.py --serve
+# → API starts at http://localhost:5000
+```
 
 ---
 
-## Algorithm Reference (for viva)
+## API Endpoints (Flask)
 
-### Logistic Regression from Scratch
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check + training status |
+| POST | `/predict` | Single patient prediction |
+| POST | `/predict/batch` | Batch predictions |
+| GET | `/metrics` | Training metrics for all models |
 
+---
+
+## Input Format (from .NET OCR backend)
+
+```json
+{
+  "disease": "anemia",
+  "hemoglobin": 10.2,
+  "rbc": 3.8,
+  "mcv": 74,
+  "mch": 23,
+  "hematocrit": 31,
+  "ferritin": 7
+}
 ```
-Forward pass:
-    z = w1·hemoglobin + w2·glucose + w3·rbc + w4·wbc + w5·platelets + w6·creatinine + b
-    p = sigmoid(z) = 1 / (1 + e^-z)
 
-Loss (binary cross-entropy):
-    L = -[y·log(p) + (1-y)·log(1-p)]
+**Supported field names per disease:**
 
-Gradients:
-    dL/dw = X^T · (p - y) / n
-    dL/db = mean(p - y)
+| Disease | Fields |
+|---------|--------|
+| anemia | hemoglobin, rbc, mcv, mch, hematocrit, ferritin |
+| diabetes | glucose, hba1c, bmi, age, insulin, blood_pressure |
+| infection | wbc, neutrophils, lymphocytes, crp, esr, temperature |
+| cholesterol | total_cholesterol (or cholesterol), ldl, hdl, triglycerides, vldl, cholesterol_ratio |
 
-Update rule:
-    w ← w - lr · dL/dw
-    b ← b - lr · dL/db
+---
+
+## Output Format (to .NET backend)
+
+```json
+{
+  "disease": "Anemia",
+  "risk_probability": 0.89,
+  "risk_level": "High",
+  "risk_emoji": "🔴",
+  "top_factors": [
+    {"feature": "hematocrit", "contribution": 24.54},
+    {"feature": "mch", "contribution": 22.08},
+    {"feature": "hemoglobin", "contribution": 18.33}
+  ],
+  "explanation": "Risk is primarily influenced by hematocrit and mch.",
+  "alerts": [
+    "🔴 CRITICAL: Hemoglobin critically low (< 9 g/dL) — Severe anemia",
+    "🔴 CRITICAL: RBC count critically low (< 3.5 M/uL)"
+  ],
+  "recommendations": [
+    "Increase consumption of iron-rich foods (red meat, spinach, lentils)",
+    "Consider Vitamin C intake to enhance iron absorption"
+  ],
+  "disclaimer": "This system is for awareness only and not a replacement for professional medical advice.",
+  "model_metrics": {
+    "accuracy": 1.0,
+    "f1_score": 1.0,
+    "auc": 1.0
+  }
+}
 ```
 
-### Risk Thresholds
-| Probability | Category   | Alert |
-|-------------|-----------|-------|
-| < 0.20      | Low        | 🟢   |
-| 0.20–0.50   | Borderline | ⚠️   |
-| 0.50–0.75   | Moderate   | 🟡   |
-| ≥ 0.75      | High       | 🔴   |
+---
 
-### Safety Override Rules (Critical)
-| Condition              | Action             |
-|------------------------|--------------------|
-| Hemoglobin < 9 g/dL    | Force → High Risk  |
-| Glucose > 200 mg/dL    | Force → High Risk  |
-| WBC > 20 K/uL          | Force → High Risk  |
-| Platelets < 50 K/uL    | Force → High Risk  |
-| Creatinine > 3.0 mg/dL | Force → High Risk  |
+## Risk Categorization
+
+| Probability | Level | Emoji |
+|-------------|-------|-------|
+| p < 0.20 | Low Risk | 🟢 |
+| 0.20 – 0.50 | Borderline | ⚠️ |
+| 0.50 – 0.75 | Moderate | 🟡 |
+| p > 0.75 | High | 🔴 |
+
+---
+
+## ML Implementation (Logistic Regression FROM SCRATCH)
+
+### Core Math
+```
+z = w1*x1 + w2*x2 + ... + wn*xn + b     (linear combination)
+p = 1 / (1 + e^(-z))                     (sigmoid activation)
+L = -[y*log(p) + (1-y)*log(1-p)]         (binary cross-entropy loss)
+w = w - lr * (dL/dw)                     (gradient descent)
+```
+
+### Features per disease
+- Separate feature sets per disease
+- Min-Max normalization (from scratch)
+- 80/20 train/test split (from scratch)
+- Metrics: Accuracy, Precision, Recall, F1, AUC (all from scratch)
+
+---
+
+## Safety Layer (Critical Overrides)
+
+Each disease has rule-based overrides. Example:
+- Hemoglobin < 9 → Force HIGH risk (anemia)
+- Glucose > 200 → Force HIGH risk (diabetes)
+- WBC > 20,000 → Force HIGH risk (infection)
+- Total Cholesterol > 280 → Force HIGH risk (cholesterol)
+
+**Philosophy: Prefer false positives. Safety first.**
+
+---
+
+## Explainability
+
+Feature importance computed as:
+```
+contribution = feature_value × weight
+importance = |contribution| / sum(|contributions|) × 100
+```
+
+Returns human-readable explanation of top contributing factors.
+
+---
+
+## Training Results (on 2000 synthetic samples per disease)
+
+| Disease | Accuracy | F1 Score | AUC |
+|---------|----------|----------|-----|
+| Anemia | 100.00% | 100.00% | 1.000 |
+| Diabetes | 100.00% | 100.00% | 0.998 |
+| Infection | 100.00% | 100.00% | 0.999 |
+| Cholesterol | 100.00% | 100.00% | 0.999 |
+
+---
+
+## Viva Preparation Summary
+
+**Why logistic regression?**
+- Interpretable and medically acceptable
+- Works well for binary classification with small-medium datasets
+- Weights directly show feature importance
+
+**Why synthetic data?**
+- Real medical data is limited, imbalanced, and privacy-restricted
+- Synthetic data generated from clinical reference ranges
+- Allows controlled class balance and edge case coverage
+
+**Why separate models?**
+- Different diseases use completely different biomarkers
+- Separate models = better accuracy + cleaner explainability
+- Modular design allows independent updates
+
+**Why not deep learning?**
+- Not explainable (black box)
+- Requires massive datasets
+- Not medically acceptable without clinical validation
+
+**How is safety ensured?**
+- Rule-based overrides for critical values
+- Conservative thresholds (prefer false positives)
+- Safety layer runs AFTER ML prediction and can override it
+
+---
+
+## Integration with .NET Backend
+
+```python
+# In your Flask app (predictor.py --serve)
+# POST to http://localhost:5000/predict
+# with JSON body containing disease + lab values
+# Returns structured JSON response
+
+# .NET can call this with HttpClient:
+# var response = await httpClient.PostAsJsonAsync("http://localhost:5000/predict", labData);
+```
+
+---
+
+*This system is for academic and awareness purposes only.*
+*Not a replacement for professional medical diagnosis.*

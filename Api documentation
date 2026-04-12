@@ -1,0 +1,132 @@
+
+# Medical Risk Predictor API Documentation
+
+## Overview
+REST API for AI-based medical report interpretation and early risk detection. Provides endpoints for single and batch patient predictions across multiple disease categories.
+
+## Base URL
+```
+http://localhost:5000
+```
+
+## Authentication
+None (currently open)
+
+## Endpoints
+
+### Health Check
+**GET** `/health`
+
+Check API status and available models.
+
+**Response:**
+```json
+{
+    "status": "healthy",
+    "models_trained": true,
+    "supported_diseases": ["anemia", "diabetes", "infection", "cholesterol"]
+}
+```
+
+---
+
+### Single Prediction
+**POST** `/predict`
+
+Generate risk assessment for a single patient.
+
+**Request Body:**
+```json
+{
+    "disease": "anemia",
+    "hemoglobin": 10.2,
+    "rbc": 3.8,
+    "hematocrit": 31,
+    "mcv": 74,
+    "mch": 23,
+    "ferritin": 7
+}
+```
+
+**Response:**
+```json
+{
+    "disease": "anemia",
+    "risk_level": "HIGH",
+    "risk_emoji": "🔴",
+    "risk_probability": 0.87,
+    "explanation": "Patient shows multiple anemia indicators...",
+    "top_factors": [
+        {"feature": "hemoglobin", "contribution": 35.2},
+        {"feature": "ferritin", "contribution": 28.1}
+    ],
+    "alerts": ["Low hemoglobin detected", "Iron deficiency suspected"],
+    "recommendations": ["Schedule tests...", "Increase iron intake..."],
+    "model_metrics": {"accuracy": 0.92, "f1_score": 0.89, "auc": 0.95}
+}
+```
+
+---
+
+### Batch Prediction
+**POST** `/predict/batch`
+
+Process multiple patients in one request.
+
+**Request Body:**
+```json
+[
+    {"disease": "anemia", "hemoglobin": 10.2, ...},
+    {"disease": "diabetes", "glucose": 185, ...}
+]
+```
+
+**Response:**
+```json
+[
+    {"disease": "anemia", "risk_level": "HIGH", ...},
+    {"disease": "diabetes", "risk_level": "MEDIUM", ...}
+]
+```
+
+---
+
+### Model Metrics
+**GET** `/metrics`
+
+Retrieve training performance metrics for all models.
+
+**Response:**
+```json
+{
+    "anemia": {"accuracy": 0.92, "f1_score": 0.89, "auc": 0.95, "precision": 0.91, "recall": 0.88},
+    "diabetes": {"accuracy": 0.88, "f1_score": 0.85, "auc": 0.92, ...},
+    ...
+}
+```
+
+## Supported Diseases & Parameters
+
+| Disease | Required Parameters |
+|---------|-------------------|
+| **anemia** | hemoglobin, rbc, hematocrit, mcv, mch, ferritin |
+| **diabetes** | glucose, hba1c, bmi, age, insulin, blood_pressure |
+| **infection** | wbc, neutrophils, lymphocytes, crp, esr, temperature |
+| **cholesterol** | total_cholesterol, ldl, hdl, triglycerides, vldl, cholesterol_ratio |
+
+## Error Handling
+
+**Missing disease field:**
+```json
+{"error": "Missing 'disease' field in input", "supported_diseases": [...]}
+```
+
+**Unsupported disease:**
+```json
+{"error": "Disease 'xyz' not supported", "supported_diseases": [...]}
+```
+
+**Server error (500):**
+```json
+{"error": "Internal server error message"}
+```

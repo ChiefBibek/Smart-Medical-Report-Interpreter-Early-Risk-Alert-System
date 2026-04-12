@@ -205,3 +205,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+/.vs/slnx.sqlite
+/.vs/Smart-Medical-Report-Interpreter-Early-Risk-Alert-System.slnx/FileContentIndex
+*.sqlite-journal

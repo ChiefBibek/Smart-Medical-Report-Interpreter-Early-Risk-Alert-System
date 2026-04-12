@@ -1,7 +1,7 @@
 # AI-Based Smart Medical Report Interpreter & Early Risk Detection System
 
 > Final Year Project — Python ML System  
-> Author: [Your Name] | Supervisor: [Supervisor Name]
+> Author: Bibek and Anwit
 
 ---
 

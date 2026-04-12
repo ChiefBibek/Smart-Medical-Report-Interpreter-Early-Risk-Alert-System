@@ -208,3 +208,5 @@ __marimo__/
 /.vs/slnx.sqlite
 /.vs/Smart-Medical-Report-Interpreter-Early-Risk-Alert-System.slnx/FileContentIndex
 *.sqlite-journal
+
+/.vs

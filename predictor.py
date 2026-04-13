@@ -2,53 +2,94 @@
 AI-Based Smart Medical Report Interpreter & Early Risk Detection System
 Main Prediction Engine
 
-Usage:
+Field Rules
+-----------
+Each disease has:
+  - MANDATORY_FIELDS : prediction is blocked if any of these are missing
+  - OPTIONAL_FIELDS  : prediction runs with imputation from training mean if absent
+                       confidence score drops with each missing optional field
+
+Usage
+-----
     from predictor import MedicalRiskPredictor
-    
+
     predictor = MedicalRiskPredictor()
     predictor.train_all()
-    
+
+    # Minimal input (mandatory only)
+    result = predictor.predict({"disease": "anemia", "hemoglobin": 8.5})
+
+    # Full input (mandatory + all optional)
     result = predictor.predict({
         "disease": "anemia",
-        "hemoglobin": 10.2,
-        "rbc": 3.8,
-        "hematocrit": 31,
-        "mcv": 74,
-        "mch": 23,
-        "ferritin": 7
+        "hemoglobin": 8.5, "rbc": 3.2, "mcv": 70,
+        "mch": 21, "hematocrit": 28, "ferritin": 6
     })
 """
 
-import json
-import sys
-import os
-
-# Add project root to path
+import json, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from models.disease_models import AnemiaModel, DiabetesModel, InfectionModel, CholesterolModel
 
+FIELD_SCHEMA = {
+    "anemia": {
+        "mandatory": {"hemoglobin": "Hemoglobin (g/dL)"},
+        "optional":  {
+            "rbc":        "Red Blood Cell count (M/uL)",
+            "mcv":        "Mean Corpuscular Volume (fL)",
+            "mch":        "Mean Corpuscular Hemoglobin (pg)",
+            "hematocrit": "Hematocrit (%)",
+            "ferritin":   "Serum Ferritin (ng/mL)",
+        }
+    },
+    "diabetes": {
+        "mandatory": {"glucose": "Fasting Blood Glucose (mg/dL)"},
+        "optional":  {
+            "hba1c":          "Glycated Hemoglobin HbA1c (%)",
+            "bmi":            "Body Mass Index",
+            "age":            "Patient Age (years)",
+            "insulin":        "Serum Insulin (uU/mL)",
+            "blood_pressure": "Diastolic Blood Pressure (mmHg)",
+        }
+    },
+    "infection": {
+        "mandatory": {"wbc": "White Blood Cell count (cells/uL)"},
+        "optional":  {
+            "neutrophils":  "Neutrophil percentage (%)",
+            "lymphocytes":  "Lymphocyte percentage (%)",
+            "crp":          "C-Reactive Protein (mg/L)",
+            "esr":          "Erythrocyte Sedimentation Rate (mm/hr)",
+            "temperature":  "Body Temperature (°C)",
+        }
+    },
+    "cholesterol": {
+        "mandatory": {"total_cholesterol": "Total Cholesterol (mg/dL)"},
+        "optional":  {
+            "ldl":               "LDL Cholesterol (mg/dL)",
+            "hdl":               "HDL Cholesterol (mg/dL)",
+            "triglycerides":     "Triglycerides (mg/dL)",
+            "vldl":              "VLDL Cholesterol (mg/dL)",
+            "cholesterol_ratio": "Total Cholesterol / HDL Ratio",
+        }
+    }
+}
+
 
 class MedicalRiskPredictor:
-    """
-    Central prediction engine.
-    Manages all disease-specific models.
-    """
-
     SUPPORTED_DISEASES = ["anemia", "diabetes", "infection", "cholesterol"]
 
     def __init__(self):
         self.models = {
-            "anemia": AnemiaModel(),
-            "diabetes": DiabetesModel(),
-            "infection": InfectionModel(),
-            "cholesterol": CholesterolModel()
+            "anemia":      AnemiaModel(),
+            "diabetes":    DiabetesModel(),
+            "infection":   InfectionModel(),
+            "cholesterol": CholesterolModel(),
         }
         self.training_metrics = {}
         self._trained = False
 
     def train_all(self, verbose=True):
-        """Train all disease models on generated datasets."""
         if verbose:
             print("\n" + "=" * 60)
             print("  TRAINING ALL DISEASE MODELS")
@@ -57,86 +98,64 @@ class MedicalRiskPredictor:
         for disease, model in self.models.items():
             if verbose:
                 print(f"\n🔬 Training {disease.upper()} model...")
-
             metrics = model.train_on_generated_data()
             self.training_metrics[disease] = metrics
-
             if verbose:
-                print(f"   ✅ Accuracy:  {metrics['accuracy'] * 100:.2f}%")
-                print(f"   ✅ F1 Score:  {metrics['f1_score'] * 100:.2f}%")
-                print(f"   ✅ AUC:       {metrics['auc']:.4f}")
-                print(f"   ✅ Precision: {metrics['precision'] * 100:.2f}%")
-                print(f"   ✅ Recall:    {metrics['recall'] * 100:.2f}%")
+                print(f"   ✅ Accuracy : {metrics['accuracy']*100:.2f}%")
+                print(f"   ✅ F1 Score : {metrics['f1_score']*100:.2f}%")
+                print(f"   ✅ AUC      : {metrics['auc']:.4f}")
 
         self._trained = True
-
         if verbose:
             print("\n" + "=" * 60)
             print("  ✅ ALL MODELS TRAINED SUCCESSFULLY")
             print("=" * 60 + "\n")
-
         return self.training_metrics
 
+    def get_field_schema(self, disease=None):
+        """Return mandatory/optional field schema for one or all diseases."""
+        if disease:
+            return FIELD_SCHEMA.get(disease.lower(), {"error": "Unknown disease"})
+        return FIELD_SCHEMA
+
     def predict(self, input_data):
-        """
-        Main prediction endpoint.
-        
-        Args:
-            input_data (dict): Must contain "disease" key + lab values
-            
-        Returns:
-            dict: Structured JSON response for backend
-        """
         if not self._trained:
             raise RuntimeError("Models not trained. Call train_all() first.")
 
-        # Validate input
         if "disease" not in input_data:
             return {
-                "error": "Missing 'disease' field in input",
-                "supported_diseases": self.SUPPORTED_DISEASES
+                "error": "Missing 'disease' field",
+                "supported_diseases": self.SUPPORTED_DISEASES,
+                "field_schema": FIELD_SCHEMA,
             }
 
         disease = input_data["disease"].lower().strip()
-
         if disease not in self.SUPPORTED_DISEASES:
             return {
                 "error": f"Disease '{disease}' not supported",
-                "supported_diseases": self.SUPPORTED_DISEASES
+                "supported_diseases": self.SUPPORTED_DISEASES,
             }
 
-        # Route to correct model
-        model = self.models[disease]
-        result = model.predict(input_data)
-
-        # Add model performance info
-        result["model_metrics"] = self.training_metrics.get(disease, {})
-
+        result = self.models[disease].predict(input_data)
+        if "error" not in result:
+            result["model_metrics"] = self.training_metrics.get(disease, {})
         return result
 
-    def get_training_metrics(self):
-        """Return training metrics for all models."""
-        return self.training_metrics
-
     def predict_batch(self, input_list):
-        """Predict for multiple patients at once."""
         return [self.predict(inp) for inp in input_list]
 
+    def get_training_metrics(self):
+        return self.training_metrics
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FLASK API WRAPPER (for .NET Backend Integration)
-# ─────────────────────────────────────────────────────────────────────────────
+
+# ─── Flask API ────────────────────────────────────────────────────────────────
 
 def create_flask_app(predictor):
-    """
-    Create Flask REST API for .NET backend integration.
-    Run with: python predictor.py --serve
-    """
     try:
         from flask import Flask, request, jsonify
         from flask_cors import CORS
     except ImportError:
-        print("Flask not installed. Run: pip install flask flask-cors")
+        print("Run: pip install flask flask-cors")
         return None
 
     app = Flask(__name__)
@@ -147,24 +166,26 @@ def create_flask_app(predictor):
         return jsonify({
             "status": "healthy",
             "models_trained": predictor._trained,
-            "supported_diseases": MedicalRiskPredictor.SUPPORTED_DISEASES
+            "supported_diseases": MedicalRiskPredictor.SUPPORTED_DISEASES,
         })
+
+    @app.route("/schema", methods=["GET"])
+    def schema():
+        """Return mandatory/optional field schema for all diseases."""
+        disease = request.args.get("disease")
+        return jsonify(predictor.get_field_schema(disease))
 
     @app.route("/predict", methods=["POST"])
     def predict():
         try:
-            data = request.get_json()
-            result = predictor.predict(data)
-            return jsonify(result)
+            return jsonify(predictor.predict(request.get_json()))
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
     @app.route("/predict/batch", methods=["POST"])
     def predict_batch():
         try:
-            data = request.get_json()
-            results = predictor.predict_batch(data)
-            return jsonify(results)
+            return jsonify(predictor.predict_batch(request.get_json()))
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -175,114 +196,96 @@ def create_flask_app(predictor):
     return app
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# DEMO / CLI
-# ─────────────────────────────────────────────────────────────────────────────
+# ─── Demo ─────────────────────────────────────────────────────────────────────
 
 def run_demo():
-    """Run a full demonstration of all disease models."""
-
     predictor = MedicalRiskPredictor()
     predictor.train_all(verbose=True)
 
     test_cases = [
+        # Full input
         {
-            "name": "Patient A — Suspected Anemia",
-            "input": {
-                "disease": "anemia",
-                "hemoglobin": 8.5,
-                "rbc": 3.2,
-                "mcv": 70,
-                "mch": 21,
-                "hematocrit": 28,
-                "ferritin": 6
-            }
+            "label": "Patient A — Anemia (full input, all 6 fields)",
+            "input": {"disease": "anemia", "hemoglobin": 8.5, "rbc": 3.2,
+                      "mcv": 70, "mch": 21, "hematocrit": 28, "ferritin": 6}
         },
+        # Mandatory only
         {
-            "name": "Patient B — Diabetes Risk",
-            "input": {
-                "disease": "diabetes",
-                "glucose": 185,
-                "hba1c": 7.8,
-                "bmi": 32,
-                "age": 55,
-                "insulin": 200,
-                "blood_pressure": 92
-            }
+            "label": "Patient B — Anemia (mandatory only — hemoglobin alone)",
+            "input": {"disease": "anemia", "hemoglobin": 8.5}
         },
+        # Partial optional
         {
-            "name": "Patient C — Possible Infection",
-            "input": {
-                "disease": "infection",
-                "wbc": 16000,
-                "neutrophils": 82,
-                "lymphocytes": 12,
-                "crp": 75,
-                "esr": 55,
-                "temperature": 39.2
-            }
+            "label": "Patient C — Diabetes (mandatory + 2 optional)",
+            "input": {"disease": "diabetes", "glucose": 185, "hba1c": 7.8}
         },
+        # Missing mandatory → error
         {
-            "name": "Patient D — Cholesterol Risk",
-            "input": {
-                "disease": "cholesterol",
-                "total_cholesterol": 265,
-                "ldl": 178,
-                "hdl": 38,
-                "triglycerides": 230,
-                "vldl": 48,
-                "cholesterol_ratio": 7.0
-            }
+            "label": "Patient D — Diabetes (missing mandatory glucose → ERROR expected)",
+            "input": {"disease": "diabetes", "hba1c": 7.8, "bmi": 32}
         },
+        # Infection full
         {
-            "name": "Patient E — Healthy (Anemia Screen)",
-            "input": {
-                "disease": "anemia",
-                "hemoglobin": 14.5,
-                "rbc": 4.9,
-                "mcv": 91,
-                "mch": 30,
-                "hematocrit": 44,
-                "ferritin": 95
-            }
-        }
+            "label": "Patient E — Infection (full input)",
+            "input": {"disease": "infection", "wbc": 16000, "neutrophils": 82,
+                      "lymphocytes": 12, "crp": 75, "esr": 55, "temperature": 39.2}
+        },
+        # Infection minimal
+        {
+            "label": "Patient F — Infection (mandatory WBC only)",
+            "input": {"disease": "infection", "wbc": 16000}
+        },
+        # Cholesterol with alias
+        {
+            "label": "Patient G — Cholesterol ('cholesterol' alias + LDL/HDL)",
+            "input": {"disease": "cholesterol", "cholesterol": 265, "ldl": 178, "hdl": 38}
+        },
+        # Healthy anemia full
+        {
+            "label": "Patient H — Healthy anemia screen (full input)",
+            "input": {"disease": "anemia", "hemoglobin": 14.5, "rbc": 4.9,
+                      "mcv": 91, "mch": 30, "hematocrit": 44, "ferritin": 95}
+        },
     ]
 
-    print("\n" + "=" * 60)
+    print("\n" + "=" * 65)
     print("  PREDICTION DEMO")
-    print("=" * 60)
+    print("=" * 65)
 
     for case in test_cases:
-        print(f"\n📋 {case['name']}")
-        print("-" * 40)
-
+        print(f"\n📋 {case['label']}")
+        print("-" * 55)
         result = predictor.predict(case["input"])
 
-        print(f"  Disease:      {result['disease']}")
-        print(f"  Risk Level:   {result['risk_emoji']} {result['risk_level']}")
-        print(f"  Probability:  {result['risk_probability'] * 100:.1f}%")
-        print(f"  Explanation:  {result['explanation']}")
+        if "error" in result:
+            print(f"  ❌ ERROR: {result['message']}")
+            print(f"     Mandatory fields required: {result['mandatory_fields']}")
+        else:
+            conf_icon = "🟢" if result["prediction_confidence"] == 100 else "🟡"
+            print(f"  Disease      : {result['disease']}")
+            print(f"  Risk Level   : {result['risk_emoji']} {result['risk_level']}")
+            print(f"  Probability  : {result['risk_probability']*100:.1f}%")
+            print(f"  Confidence   : {conf_icon} {result['prediction_confidence']}%")
+            print(f"  Provided     : {result['fields_provided']}")
+            if result["fields_imputed"]:
+                print(f"  Imputed      : {result['fields_imputed']}")
+            print(f"  Explanation  : {result['explanation']}")
+            if result["alerts"]:
+                print(f"  Alerts       :")
+                for a in result["alerts"]:
+                    print(f"    {a}")
+            print(f"  Top factors  :")
+            for f in result["top_factors"]:
+                imp_tag = " [estimated]" if f["imputed"] else ""
+                print(f"    • {f['feature']}: {f['contribution']:.1f}%{imp_tag}")
 
-        print(f"  Top Factors:")
-        for f in result["top_factors"]:
-            print(f"    • {f['feature']}: {f['contribution']:.1f}%")
-
-        if result["alerts"]:
-            print(f"  🚨 Alerts:")
-            for alert in result["alerts"]:
-                print(f"    {alert}")
-
-        print(f"  💡 Recommendations:")
-        for rec in result["recommendations"][:2]:
-            print(f"    • {rec}")
-
-    print("\n✅ Demo completed successfully!")
-    print("\n📤 Sample JSON Output (for .NET backend):")
-    sample = predictor.predict(test_cases[0]["input"])
-    # Clean for JSON output
+    print("\n" + "=" * 65)
+    print("  SAMPLE JSON OUTPUT (mandatory-only anemia prediction)")
+    print("=" * 65)
+    sample = predictor.predict({"disease": "anemia", "hemoglobin": 8.5})
     sample.pop("all_factors", None)
     sample.pop("model_metrics", None)
-    print(json.dumps(sample, indent=2))
+    print(json.dumps(sample, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

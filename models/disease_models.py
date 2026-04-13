@@ -1,6 +1,12 @@
 """
-Disease-Specific Model Trainers
-Each disease has its own model, feature set, safety layer, and explainer.
+Disease-Specific Model Trainers — with Mandatory / Optional Field Support
+
+Each disease defines:
+  MANDATORY_FIELDS  — minimum required to run the model (prediction blocked without these)
+  OPTIONAL_FIELDS   — enrich prediction when present (imputed from training mean if absent)
+
+Missing optional fields are filled with the training-set mean for that feature.
+A confidence score (0-100%) reflects how many optional fields were actually provided.
 """
 
 import numpy as np
@@ -12,56 +18,60 @@ from data.data_generator import (
 
 
 class DiseaseModel:
-    """Base class for all disease models."""
+    """Base class for all disease-specific models."""
+
+    MANDATORY_FIELDS = []
+    OPTIONAL_FIELDS  = []
 
     def __init__(self, disease_name, learning_rate=0.05, n_iterations=2000):
-        self.disease_name = disease_name
-        self.model = LogisticRegressionScratch(
-            learning_rate=learning_rate,
-            n_iterations=n_iterations
-        )
-        self.normalizer = MinMaxNormalizer()
-        self.feature_names = []
-        self.is_trained = False
-        self.metrics = {}
+        self.disease_name    = disease_name
+        self.model           = LogisticRegressionScratch(learning_rate=learning_rate,
+                                                         n_iterations=n_iterations)
+        self.normalizer      = MinMaxNormalizer()
+        self.feature_names   = []
+        self.training_means  = {}
+        self.is_trained      = False
+        self.metrics         = {}
 
     def train(self, X, y, feature_names):
-        """Train model with normalized data."""
-        self.feature_names = feature_names
+        self.feature_names  = feature_names
+        self.training_means = {fname: float(np.mean(X[:, i]))
+                               for i, fname in enumerate(feature_names)}
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_ratio=0.2)
-
-        # Normalize
         X_train_norm = self.normalizer.fit_transform(X_train)
-        X_test_norm = self.normalizer.transform(X_test)
-
-        # Train
+        X_test_norm  = self.normalizer.transform(X_test)
         self.model.fit(X_train_norm, y_train)
-
-        # Evaluate
-        y_pred = self.model.predict(X_test_norm)
-        y_prob = self.model.predict_proba(X_test_norm)
+        y_pred       = self.model.predict(X_test_norm)
+        y_prob       = self.model.predict_proba(X_test_norm)
         self.metrics = compute_metrics(y_test, y_pred, y_prob)
         self.is_trained = True
-
         return self.metrics
 
-    def predict(self, input_dict):
-        """
-        Predict risk from input dictionary.
-        Returns: probability, risk_level, contributions
-        """
-        raise NotImplementedError("Subclasses must implement predict()")
+    def validate_input(self, input_dict):
+        missing_mandatory = [f for f in self.MANDATORY_FIELDS
+                             if f not in input_dict or input_dict[f] is None]
+        missing_optional  = [f for f in self.OPTIONAL_FIELDS
+                             if f not in input_dict or input_dict[f] is None]
+        return (len(missing_mandatory) == 0), missing_mandatory, missing_optional
 
-    def _map_input_to_features(self, input_dict):
-        """Map OCR JSON keys to expected feature array."""
-        values = []
+    def _build_feature_array(self, input_dict):
+        values         = []
+        imputed_fields = []
         for fname in self.feature_names:
-            val = input_dict.get(fname, np.nan)
-            values.append(float(val) if val is not None else 0.0)
-        return np.array(values)
+            if fname in input_dict and input_dict[fname] is not None:
+                values.append(float(input_dict[fname]))
+            else:
+                values.append(self.training_means.get(fname, 0.0))
+                imputed_fields.append(fname)
+        return np.array(values), imputed_fields
+
+    def _compute_confidence(self, missing_optional):
+        if not self.OPTIONAL_FIELDS:
+            return 100.0
+        provided = len(self.OPTIONAL_FIELDS) - len(missing_optional)
+        return round((provided / len(self.OPTIONAL_FIELDS)) * 100, 1)
 
     def _get_risk_level(self, probability):
-        """Categorize risk probability."""
         if probability < 0.2:
             return "Low", "🟢"
         elif probability < 0.5:
@@ -71,45 +81,103 @@ class DiseaseModel:
         else:
             return "High", "🔴"
 
-    def _compute_contributions(self, raw_input_array):
-        """
-        Compute feature contributions for explainability.
-        contribution = feature_value × weight
-        importance = |contribution| / sum(|contributions|) × 100
-        """
-        weights, bias = self.model.get_weights()
-        contributions = raw_input_array * weights
-
+    def _compute_contributions(self, norm_array, imputed_fields):
+        weights, _ = self.model.get_weights()
+        contributions = norm_array * weights
         total = np.sum(np.abs(contributions)) + 1e-10
         importances = (np.abs(contributions) / total) * 100
-
         result = []
         for i, fname in enumerate(self.feature_names):
             result.append({
-                "feature": fname,
-                "raw_value": round(float(raw_input_array[i]), 3),
-                "weight": round(float(weights[i]), 4),
-                "contribution": round(float(contributions[i]), 4),
-                "importance_pct": round(float(importances[i]), 2)
+                "feature":        fname,
+                "importance_pct": round(float(importances[i]), 2),
+                "weight":         round(float(weights[i]), 4),
+                "imputed":        fname in imputed_fields,
             })
-
-        # Sort by importance descending
         result.sort(key=lambda x: x["importance_pct"], reverse=True)
         return result
 
-    def _generate_explanation(self, top_factors):
-        """Generate human-readable explanation."""
-        top2 = top_factors[:2]
-        factors_str = " and ".join([f["feature"].replace("_", " ") for f in top2])
-        return f"Risk is primarily influenced by {factors_str}."
+    def _generate_explanation(self, top_factors, imputed_fields, confidence):
+        actual = [f for f in top_factors if not f["imputed"]][:2]
+        imputed_note = ""
+        if imputed_fields:
+            names = ", ".join(f.replace("_", " ") for f in imputed_fields)
+            verb  = "was" if len(imputed_fields) == 1 else "were"
+            imputed_note = (f" Note: {names} {verb} not provided and estimated from "
+                            f"population averages (prediction confidence: {confidence}%).")
+        if actual:
+            factors_str = " and ".join(f["feature"].replace("_", " ") for f in actual)
+            return f"Risk is primarily driven by {factors_str}.{imputed_note}"
+        return f"Prediction based on available mandatory data.{imputed_note}"
+
+    def _run_prediction(self, input_dict):
+        is_valid, missing_mandatory, missing_optional = self.validate_input(input_dict)
+        if not is_valid:
+            return {
+                "error":             "Missing mandatory fields",
+                "disease":           self.disease_name,
+                "missing_mandatory": missing_mandatory,
+                "mandatory_fields":  self.MANDATORY_FIELDS,
+                "optional_fields":   self.OPTIONAL_FIELDS,
+                "message": (
+                    f"Cannot predict {self.disease_name} risk without: "
+                    + ", ".join(missing_mandatory) + ". These are the minimum "
+                    "required lab values for this disease."
+                )
+            }
+
+        raw_array, imputed_fields = self._build_feature_array(input_dict)
+        confidence = self._compute_confidence(missing_optional)
+
+        norm_array  = self.normalizer.transform(raw_array.reshape(1, -1))[0]
+        probability = float(self.model.predict_proba(norm_array.reshape(1, -1))[0])
+
+        probability, alerts = self._safety_override(input_dict, probability)
+
+        risk_level, risk_emoji = self._get_risk_level(probability)
+        contributions = self._compute_contributions(norm_array, imputed_fields)
+        explanation   = self._generate_explanation(contributions, imputed_fields, confidence)
+        recommendations = self._get_recommendations(risk_level, input_dict)
+
+        return {
+            "disease":          self.disease_name,
+            "risk_probability": round(probability, 4),
+            "risk_level":       risk_level,
+            "risk_emoji":       risk_emoji,
+            "fields_provided":   sorted(set(self.feature_names) - set(imputed_fields)),
+            "fields_imputed":    imputed_fields,
+            "fields_missing_optional": missing_optional,
+            "prediction_confidence": confidence,
+            "top_factors": [
+                {"feature": c["feature"], "contribution": c["importance_pct"],
+                 "imputed": c["imputed"]}
+                for c in contributions[:3]
+            ],
+            "all_factors":   contributions,
+            "explanation":   explanation,
+            "alerts":          alerts,
+            "recommendations": recommendations,
+            "disclaimer": ("This system is for awareness only and is not a replacement "
+                           "for professional medical advice."),
+        }
+
+    def predict(self, input_dict):
+        raise NotImplementedError
+
+    def _safety_override(self, input_dict, probability):
+        raise NotImplementedError
+
+    def _get_recommendations(self, risk_level, input_dict):
+        raise NotImplementedError
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# ANEMIA MODEL
+# ANEMIA  — Mandatory: hemoglobin | Optional: rbc, mcv, mch, hematocrit, ferritin
 # ─────────────────────────────────────────────────────────────────────────────
 
 class AnemiaModel(DiseaseModel):
-    """Anemia Risk Detection Model."""
+    MANDATORY_FIELDS = ["hemoglobin"]
+    OPTIONAL_FIELDS  = ["rbc", "mcv", "mch", "hematocrit", "ferritin"]
 
     def __init__(self):
         super().__init__("Anemia", learning_rate=0.05, n_iterations=2000)
@@ -119,100 +187,70 @@ class AnemiaModel(DiseaseModel):
         return self.train(X, y, feature_names)
 
     def _safety_override(self, input_dict, probability):
-        """
-        Safety Layer: Rule-based overrides for critical values.
-        Always prefer false positives (conservative).
-        """
-        alerts = []
-        forced_high = False
+        alerts, forced_high = [], False
+        hgb  = input_dict.get("hemoglobin")
+        rbc  = input_dict.get("rbc")
+        hct  = input_dict.get("hematocrit")
+        ferr = input_dict.get("ferritin")
 
-        hemoglobin = input_dict.get("hemoglobin", 99)
-        rbc = input_dict.get("rbc", 99)
-        hematocrit = input_dict.get("hematocrit", 99)
-        ferritin = input_dict.get("ferritin", 99)
-
-        if hemoglobin < 9:
-            alerts.append("🔴 CRITICAL: Hemoglobin critically low (< 9 g/dL) — Severe anemia")
+        if hgb < 7:
+            alerts.append("🔴 CRITICAL: Hemoglobin < 7 g/dL — Severe anemia, transfusion may be needed")
             forced_high = True
-        elif hemoglobin < 12:
+        elif hgb < 9:
+            alerts.append("🔴 CRITICAL: Hemoglobin < 9 g/dL — Moderate-to-severe anemia")
+            forced_high = True
+        elif hgb < 12:
             alerts.append("⚠️ Hemoglobin below normal range (< 12 g/dL)")
 
-        if rbc < 3.5:
-            alerts.append("🔴 CRITICAL: RBC count critically low (< 3.5 M/uL)")
-            forced_high = True
-        elif rbc < 4.2:
-            alerts.append("⚠️ RBC count below normal range")
+        if rbc is not None:
+            if rbc < 3.5:
+                alerts.append("🔴 CRITICAL: RBC count critically low (< 3.5 M/uL)")
+                forced_high = True
+            elif rbc < 4.2:
+                alerts.append("⚠️ RBC count below normal range")
 
-        if hematocrit < 30:
-            alerts.append("🔴 CRITICAL: Hematocrit critically low (< 30%)")
-            forced_high = True
-        elif hematocrit < 36:
-            alerts.append("⚠️ Hematocrit below normal range")
+        if hct is not None:
+            if hct < 30:
+                alerts.append("🔴 CRITICAL: Hematocrit critically low (< 30%)")
+                forced_high = True
+            elif hct < 36:
+                alerts.append("⚠️ Hematocrit below normal range")
 
-        if ferritin < 10:
+        if ferr is not None and ferr < 10:
             alerts.append("🔴 LOW FERRITIN: Iron stores depleted (< 10 ng/mL)")
 
         if forced_high:
             probability = max(probability, 0.85)
-
         return probability, alerts
 
     def predict(self, input_dict):
-        raw_array = self._map_input_to_features(input_dict)
-        norm_array = self.normalizer.transform(raw_array.reshape(1, -1))[0]
-
-        probability = float(self.model.predict_proba(norm_array.reshape(1, -1))[0])
-        probability, alerts = self._safety_override(input_dict, probability)
-
-        risk_level, risk_emoji = self._get_risk_level(probability)
-        contributions = self._compute_contributions(norm_array)
-        explanation = self._generate_explanation(contributions)
-
-        recommendations = self._get_recommendations(risk_level, input_dict)
-
-        return {
-            "disease": "Anemia",
-            "risk_probability": round(probability, 4),
-            "risk_level": risk_level,
-            "risk_emoji": risk_emoji,
-            "top_factors": [
-                {"feature": c["feature"], "contribution": c["importance_pct"]}
-                for c in contributions[:3]
-            ],
-            "all_factors": contributions,
-            "explanation": explanation,
-            "alerts": alerts,
-            "recommendations": recommendations,
-            "disclaimer": "This system is for awareness only and not a replacement for professional medical advice."
-        }
+        return self._run_prediction(input_dict)
 
     def _get_recommendations(self, risk_level, input_dict):
-        recs = []
-        hemoglobin = input_dict.get("hemoglobin", 99)
-
-        if risk_level in ["High", "Moderate"]:
-            recs.append("Increase consumption of iron-rich foods (red meat, spinach, lentils)")
-            recs.append("Consider Vitamin C intake to enhance iron absorption")
-            recs.append("Consult a hematologist for complete blood work")
-            if hemoglobin < 10:
-                recs.append("🚨 Seek immediate medical attention — may require iron supplementation or transfusion")
+        recs, hgb = [], input_dict.get("hemoglobin", 99)
+        if risk_level in ("High", "Moderate"):
+            recs.append("Increase iron-rich foods: red meat, spinach, lentils, beans")
+            recs.append("Take Vitamin C alongside iron sources to improve absorption")
+            recs.append("Consult a hematologist for complete blood panel evaluation")
+            if hgb < 10:
+                recs.append("🚨 Seek immediate attention — may require iron supplementation or transfusion")
         elif risk_level == "Borderline":
-            recs.append("Monitor hemoglobin levels regularly")
-            recs.append("Include iron-rich and folate-rich foods in diet")
-            recs.append("Schedule a follow-up blood test in 4-6 weeks")
+            recs.append("Monitor hemoglobin levels regularly (every 4–6 weeks)")
+            recs.append("Include folate-rich foods: leafy greens, citrus fruits")
+            recs.append("Schedule a follow-up CBC (complete blood count) test")
         else:
-            recs.append("Maintain a balanced diet rich in iron and B12")
-            recs.append("Continue regular health checkups")
-
+            recs.append("Maintain a balanced diet rich in iron and Vitamin B12")
+            recs.append("Continue routine annual health checkups")
         return recs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# DIABETES MODEL
+# DIABETES  — Mandatory: glucose | Optional: hba1c, bmi, age, insulin, blood_pressure
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DiabetesModel(DiseaseModel):
-    """Diabetes Risk Detection Model."""
+    MANDATORY_FIELDS = ["glucose"]
+    OPTIONAL_FIELDS  = ["hba1c", "bmi", "age", "insulin", "blood_pressure"]
 
     def __init__(self):
         super().__init__("Diabetes", learning_rate=0.05, n_iterations=2000)
@@ -222,92 +260,69 @@ class DiabetesModel(DiseaseModel):
         return self.train(X, y, feature_names)
 
     def _safety_override(self, input_dict, probability):
-        alerts = []
-        forced_high = False
+        alerts, forced_high = [], False
+        glucose = input_dict.get("glucose")
+        hba1c   = input_dict.get("hba1c")
+        bmi     = input_dict.get("bmi")
 
-        glucose = input_dict.get("glucose", 0)
-        hba1c = input_dict.get("hba1c", 0)
-        bmi = input_dict.get("bmi", 0)
-
-        if glucose > 200:
-            alerts.append("🔴 CRITICAL: Blood glucose > 200 mg/dL — Possible hyperglycemia/diabetic crisis")
+        if glucose > 300:
+            alerts.append("🔴 CRITICAL: Blood glucose > 300 mg/dL — Possible hyperglycemic crisis")
+            forced_high = True
+        elif glucose > 200:
+            alerts.append("🔴 CRITICAL: Blood glucose > 200 mg/dL — Diabetic range (symptomatic)")
             forced_high = True
         elif glucose > 126:
             alerts.append("⚠️ Fasting glucose above diabetic threshold (> 126 mg/dL)")
         elif glucose > 100:
-            alerts.append("⚠️ Pre-diabetic fasting glucose range (100-125 mg/dL)")
+            alerts.append("⚠️ Pre-diabetic fasting glucose range (100–125 mg/dL)")
 
-        if hba1c > 8.0:
-            alerts.append("🔴 CRITICAL: HbA1c > 8.0% — Poor long-term glucose control")
-            forced_high = True
-        elif hba1c > 6.5:
-            alerts.append("⚠️ HbA1c in diabetic range (> 6.5%)")
-        elif hba1c > 5.7:
-            alerts.append("⚠️ HbA1c in pre-diabetic range (5.7-6.4%)")
+        if hba1c is not None:
+            if hba1c > 10:
+                alerts.append("🔴 CRITICAL: HbA1c > 10% — Very poor long-term glucose control")
+                forced_high = True
+            elif hba1c > 8:
+                alerts.append("🔴 HbA1c > 8% — Poor long-term control")
+                forced_high = True
+            elif hba1c > 6.5:
+                alerts.append("⚠️ HbA1c in diabetic range (> 6.5%)")
+            elif hba1c > 5.7:
+                alerts.append("⚠️ HbA1c in pre-diabetic range (5.7–6.4%)")
 
-        if bmi > 35:
+        if bmi is not None and bmi > 35:
             alerts.append("⚠️ BMI > 35 — Obesity significantly increases diabetes risk")
 
         if forced_high:
             probability = max(probability, 0.85)
-
         return probability, alerts
 
     def predict(self, input_dict):
-        raw_array = self._map_input_to_features(input_dict)
-        norm_array = self.normalizer.transform(raw_array.reshape(1, -1))[0]
-
-        probability = float(self.model.predict_proba(norm_array.reshape(1, -1))[0])
-        probability, alerts = self._safety_override(input_dict, probability)
-
-        risk_level, risk_emoji = self._get_risk_level(probability)
-        contributions = self._compute_contributions(norm_array)
-        explanation = self._generate_explanation(contributions)
-        recommendations = self._get_recommendations(risk_level, input_dict)
-
-        return {
-            "disease": "Diabetes",
-            "risk_probability": round(probability, 4),
-            "risk_level": risk_level,
-            "risk_emoji": risk_emoji,
-            "top_factors": [
-                {"feature": c["feature"], "contribution": c["importance_pct"]}
-                for c in contributions[:3]
-            ],
-            "all_factors": contributions,
-            "explanation": explanation,
-            "alerts": alerts,
-            "recommendations": recommendations,
-            "disclaimer": "This system is for awareness only and not a replacement for professional medical advice."
-        }
+        return self._run_prediction(input_dict)
 
     def _get_recommendations(self, risk_level, input_dict):
-        recs = []
-        glucose = input_dict.get("glucose", 0)
-
-        if risk_level in ["High", "Moderate"]:
+        recs, glucose = [], input_dict.get("glucose", 0)
+        if risk_level in ("High", "Moderate"):
             recs.append("Significantly reduce sugar and refined carbohydrate intake")
-            recs.append("Increase physical activity — aim for 150 minutes/week")
-            recs.append("Consult an endocrinologist immediately")
+            recs.append("Aim for at least 150 minutes of moderate exercise per week")
+            recs.append("Consult an endocrinologist for a full diabetes evaluation")
             if glucose > 200:
-                recs.append("🚨 Seek emergency medical care — blood glucose critically elevated")
+                recs.append("🚨 Seek emergency care — blood glucose critically elevated")
         elif risk_level == "Borderline":
-            recs.append("Adopt a low-glycemic diet plan")
-            recs.append("Monitor blood sugar levels daily")
-            recs.append("Schedule HbA1c test in 3 months")
+            recs.append("Adopt a low-glycemic index diet plan")
+            recs.append("Monitor fasting blood sugar daily if possible")
+            recs.append("Schedule an HbA1c test if not already available")
         else:
-            recs.append("Maintain healthy weight and active lifestyle")
-            recs.append("Annual fasting glucose screening recommended")
-
+            recs.append("Maintain healthy weight and an active lifestyle")
+            recs.append("Annual fasting glucose screening is recommended")
         return recs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# INFECTION MODEL
+# INFECTION  — Mandatory: wbc | Optional: neutrophils, lymphocytes, crp, esr, temperature
 # ─────────────────────────────────────────────────────────────────────────────
 
 class InfectionModel(DiseaseModel):
-    """Infection Risk Detection Model."""
+    MANDATORY_FIELDS = ["wbc"]
+    OPTIONAL_FIELDS  = ["neutrophils", "lymphocytes", "crp", "esr", "temperature"]
 
     def __init__(self):
         super().__init__("Infection", learning_rate=0.05, n_iterations=2000)
@@ -317,95 +332,86 @@ class InfectionModel(DiseaseModel):
         return self.train(X, y, feature_names)
 
     def _safety_override(self, input_dict, probability):
-        alerts = []
-        forced_high = False
+        alerts, forced_high = [], False
+        wbc   = input_dict.get("wbc")
+        crp   = input_dict.get("crp")
+        temp  = input_dict.get("temperature")
+        neut  = input_dict.get("neutrophils")
+        lymph = input_dict.get("lymphocytes")
 
-        wbc = input_dict.get("wbc", 0)
-        crp = input_dict.get("crp", 0)
-        temperature = input_dict.get("temperature", 37)
-        neutrophils = input_dict.get("neutrophils", 0)
-
-        if wbc > 20000:
-            alerts.append("🔴 CRITICAL: WBC > 20,000 — Severe leukocytosis, possible severe infection/sepsis")
+        if wbc > 30000:
+            alerts.append("🔴 CRITICAL: WBC > 30,000 — Possible leukemia or severe sepsis")
+            forced_high = True
+        elif wbc > 20000:
+            alerts.append("🔴 CRITICAL: WBC > 20,000 — Severe leukocytosis, possible sepsis")
             forced_high = True
         elif wbc > 12000:
-            alerts.append("⚠️ Elevated WBC count (> 12,000) — Possible infection")
-
-        if crp > 100:
-            alerts.append("🔴 CRITICAL: CRP > 100 mg/L — Severe systemic inflammation")
+            alerts.append("⚠️ Elevated WBC (> 12,000) — Possible bacterial infection")
+        elif wbc < 2000:
+            alerts.append("🔴 CRITICAL: WBC < 2,000 — Severe leukopenia, immune compromise")
             forced_high = True
-        elif crp > 10:
-            alerts.append("⚠️ Elevated CRP (> 10 mg/L) — Inflammation detected")
+        elif wbc < 4000:
+            alerts.append("⚠️ Low WBC (< 4,000) — Possible viral infection or bone marrow issue")
 
-        if temperature > 39.5:
-            alerts.append("🔴 CRITICAL: High fever (> 39.5°C) — Possible serious infection")
-            forced_high = True
-        elif temperature > 38.0:
-            alerts.append("⚠️ Fever detected (> 38°C)")
+        if crp is not None:
+            if crp > 200:
+                alerts.append("🔴 CRITICAL: CRP > 200 mg/L — Severe systemic infection/sepsis")
+                forced_high = True
+            elif crp > 100:
+                alerts.append("🔴 CRP > 100 mg/L — Severe inflammation")
+                forced_high = True
+            elif crp > 10:
+                alerts.append("⚠️ Elevated CRP (> 10 mg/L) — Active inflammation detected")
 
-        if neutrophils > 80:
+        if temp is not None:
+            if temp > 40:
+                alerts.append("🔴 CRITICAL: Fever > 40°C — Hyperpyrexia, seek emergency care")
+                forced_high = True
+            elif temp > 39.5:
+                alerts.append("🔴 High fever > 39.5°C — Possible serious infection")
+                forced_high = True
+            elif temp > 38:
+                alerts.append("⚠️ Fever detected (> 38°C)")
+            elif temp < 36:
+                alerts.append("⚠️ Low temperature (< 36°C) — Possible hypothermia or sepsis")
+
+        if neut is not None and neut > 80:
             alerts.append("⚠️ Elevated neutrophils (> 80%) — Bacterial infection suspected")
+        if lymph is not None and lymph < 10:
+            alerts.append("⚠️ Low lymphocytes (< 10%) — Possible viral infection or immune stress")
 
         if forced_high:
             probability = max(probability, 0.85)
-
         return probability, alerts
 
     def predict(self, input_dict):
-        raw_array = self._map_input_to_features(input_dict)
-        norm_array = self.normalizer.transform(raw_array.reshape(1, -1))[0]
-
-        probability = float(self.model.predict_proba(norm_array.reshape(1, -1))[0])
-        probability, alerts = self._safety_override(input_dict, probability)
-
-        risk_level, risk_emoji = self._get_risk_level(probability)
-        contributions = self._compute_contributions(norm_array)
-        explanation = self._generate_explanation(contributions)
-        recommendations = self._get_recommendations(risk_level, input_dict)
-
-        return {
-            "disease": "Infection",
-            "risk_probability": round(probability, 4),
-            "risk_level": risk_level,
-            "risk_emoji": risk_emoji,
-            "top_factors": [
-                {"feature": c["feature"], "contribution": c["importance_pct"]}
-                for c in contributions[:3]
-            ],
-            "all_factors": contributions,
-            "explanation": explanation,
-            "alerts": alerts,
-            "recommendations": recommendations,
-            "disclaimer": "This system is for awareness only and not a replacement for professional medical advice."
-        }
+        return self._run_prediction(input_dict)
 
     def _get_recommendations(self, risk_level, input_dict):
-        recs = []
-        wbc = input_dict.get("wbc", 0)
-
-        if risk_level in ["High", "Moderate"]:
-            recs.append("Seek immediate medical evaluation")
-            recs.append("Complete blood culture and sensitivity testing recommended")
-            recs.append("Do not self-medicate with antibiotics")
+        recs, wbc = [], input_dict.get("wbc", 0)
+        if risk_level in ("High", "Moderate"):
+            recs.append("Seek immediate medical evaluation — do not delay")
+            recs.append("Request blood culture and sensitivity testing")
+            recs.append("Do not self-medicate with antibiotics without prescription")
             if wbc > 20000:
-                recs.append("🚨 Emergency: May indicate sepsis — go to hospital immediately")
+                recs.append("🚨 Emergency: Possible sepsis — go to hospital immediately")
         elif risk_level == "Borderline":
-            recs.append("Monitor temperature and symptoms for 24-48 hours")
+            recs.append("Monitor temperature and symptoms for 24–48 hours")
             recs.append("Increase fluid intake and rest")
-            recs.append("Consult a doctor if symptoms worsen")
+            recs.append("Consult a doctor if fever persists beyond 48 hours")
         else:
-            recs.append("Maintain good hygiene and nutrition")
+            recs.append("Maintain good hygiene and balanced nutrition")
             recs.append("Ensure vaccinations are up to date")
-
         return recs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# CHOLESTEROL MODEL
+# CHOLESTEROL  — Mandatory: total_cholesterol | Optional: ldl, hdl, triglycerides, vldl, cholesterol_ratio
 # ─────────────────────────────────────────────────────────────────────────────
 
 class CholesterolModel(DiseaseModel):
-    """Cholesterol Risk Detection Model."""
+    MANDATORY_FIELDS = ["total_cholesterol"]
+    OPTIONAL_FIELDS  = ["ldl", "hdl", "triglycerides", "vldl", "cholesterol_ratio"]
 
     def __init__(self):
         super().__init__("Cholesterol", learning_rate=0.05, n_iterations=2000)
@@ -414,90 +420,79 @@ class CholesterolModel(DiseaseModel):
         X, y, feature_names = MedicalDataGenerator.generate_cholesterol_dataset(n_samples=2000)
         return self.train(X, y, feature_names)
 
+    def _normalise_alias(self, input_dict):
+        if "cholesterol" in input_dict and "total_cholesterol" not in input_dict:
+            input_dict = dict(input_dict)
+            input_dict["total_cholesterol"] = input_dict.pop("cholesterol")
+        return input_dict
+
     def _safety_override(self, input_dict, probability):
-        alerts = []
-        forced_high = False
+        alerts, forced_high = [], False
+        tc   = input_dict.get("total_cholesterol")
+        ldl  = input_dict.get("ldl")
+        hdl  = input_dict.get("hdl")
+        trig = input_dict.get("triglycerides")
 
-        total_cholesterol = input_dict.get("total_cholesterol", 0) or input_dict.get("cholesterol", 0)
-        ldl = input_dict.get("ldl", 0)
-        hdl = input_dict.get("hdl", 99)
-        triglycerides = input_dict.get("triglycerides", 0)
-
-        if total_cholesterol > 280:
-            alerts.append("🔴 CRITICAL: Total cholesterol > 280 mg/dL — Very high cardiovascular risk")
+        if tc > 320:
+            alerts.append("🔴 CRITICAL: Total cholesterol > 320 mg/dL — Very high cardiovascular risk")
             forced_high = True
-        elif total_cholesterol > 240:
-            alerts.append("⚠️ Total cholesterol > 240 mg/dL — High risk range")
-
-        if ldl > 190:
-            alerts.append("🔴 CRITICAL: LDL > 190 mg/dL — Possible familial hypercholesterolemia")
+        elif tc > 280:
+            alerts.append("🔴 Total cholesterol > 280 mg/dL — High risk, medical review needed")
             forced_high = True
-        elif ldl > 160:
-            alerts.append("⚠️ LDL cholesterol in high risk range (> 160 mg/dL)")
+        elif tc > 240:
+            alerts.append("⚠️ Total cholesterol > 240 mg/dL — Borderline-high range")
 
-        if hdl < 35:
-            alerts.append("🔴 Very low HDL (< 35 mg/dL) — Significant cardiovascular risk factor")
-        elif hdl < 40:
-            alerts.append("⚠️ Low HDL cholesterol (< 40 mg/dL) — Increases heart disease risk")
+        if ldl is not None:
+            if ldl > 190:
+                alerts.append("🔴 CRITICAL: LDL > 190 mg/dL — Possible familial hypercholesterolemia")
+                forced_high = True
+            elif ldl > 160:
+                alerts.append("⚠️ LDL in high risk range (> 160 mg/dL)")
+            elif ldl > 130:
+                alerts.append("⚠️ LDL borderline-high (130–159 mg/dL)")
 
-        if triglycerides > 500:
-            alerts.append("🔴 CRITICAL: Triglycerides > 500 mg/dL — Risk of pancreatitis")
-            forced_high = True
-        elif triglycerides > 200:
-            alerts.append("⚠️ Elevated triglycerides (> 200 mg/dL)")
+        if hdl is not None:
+            if hdl < 35:
+                alerts.append("🔴 Very low HDL (< 35 mg/dL) — Significant cardiovascular risk")
+            elif hdl < 40:
+                alerts.append("⚠️ Low HDL (< 40 mg/dL) — Increases heart disease risk")
+
+        if trig is not None:
+            if trig > 1000:
+                alerts.append("🔴 CRITICAL: Triglycerides > 1000 mg/dL — Acute pancreatitis risk")
+                forced_high = True
+            elif trig > 500:
+                alerts.append("🔴 CRITICAL: Triglycerides > 500 mg/dL — Pancreatitis risk")
+                forced_high = True
+            elif trig > 200:
+                alerts.append("⚠️ Elevated triglycerides (> 200 mg/dL)")
 
         if forced_high:
             probability = max(probability, 0.85)
-
         return probability, alerts
 
     def predict(self, input_dict):
-        # Handle alias: "cholesterol" → "total_cholesterol"
-        if "cholesterol" in input_dict and "total_cholesterol" not in input_dict:
-            input_dict = dict(input_dict)
-            input_dict["total_cholesterol"] = input_dict["cholesterol"]
-
-        raw_array = self._map_input_to_features(input_dict)
-        norm_array = self.normalizer.transform(raw_array.reshape(1, -1))[0]
-
-        probability = float(self.model.predict_proba(norm_array.reshape(1, -1))[0])
-        probability, alerts = self._safety_override(input_dict, probability)
-
-        risk_level, risk_emoji = self._get_risk_level(probability)
-        contributions = self._compute_contributions(norm_array)
-        explanation = self._generate_explanation(contributions)
-        recommendations = self._get_recommendations(risk_level, input_dict)
-
-        return {
-            "disease": "Cholesterol",
-            "risk_probability": round(probability, 4),
-            "risk_level": risk_level,
-            "risk_emoji": risk_emoji,
-            "top_factors": [
-                {"feature": c["feature"], "contribution": c["importance_pct"]}
-                for c in contributions[:3]
-            ],
-            "all_factors": contributions,
-            "explanation": explanation,
-            "alerts": alerts,
-            "recommendations": recommendations,
-            "disclaimer": "This system is for awareness only and not a replacement for professional medical advice."
-        }
+        input_dict = self._normalise_alias(input_dict)
+        return self._run_prediction(input_dict)
 
     def _get_recommendations(self, risk_level, input_dict):
         recs = []
-
-        if risk_level in ["High", "Moderate"]:
-            recs.append("Adopt a heart-healthy diet: reduce saturated fats, eliminate trans fats")
-            recs.append("Increase soluble fiber intake (oats, beans, fruits)")
+        hdl  = input_dict.get("hdl")
+        trig = input_dict.get("triglycerides")
+        if risk_level in ("High", "Moderate"):
+            recs.append("Adopt a heart-healthy diet: cut saturated fats, eliminate trans fats")
+            recs.append("Increase soluble fiber: oats, beans, lentils, fruits")
             recs.append("Exercise at least 30 minutes daily")
             recs.append("Consult a cardiologist for lipid-lowering therapy evaluation")
+            if hdl is not None and hdl < 40:
+                recs.append("Increase HDL naturally: exercise, quit smoking, healthy fats")
+            if trig is not None and trig > 200:
+                recs.append("Reduce alcohol and sugar intake to lower triglycerides")
         elif risk_level == "Borderline":
             recs.append("Reduce dietary cholesterol and saturated fats")
-            recs.append("Increase omega-3 fatty acids (fish, flaxseed)")
-            recs.append("Recheck lipid panel in 3 months")
+            recs.append("Increase omega-3 intake: fish, flaxseed, walnuts")
+            recs.append("Recheck full lipid panel in 3 months")
         else:
-            recs.append("Maintain healthy dietary habits")
-            recs.append("Annual lipid profile screening recommended")
-
+            recs.append("Maintain healthy dietary habits and active lifestyle")
+            recs.append("Annual lipid profile screening recommended after age 35")
         return recs

@@ -23,10 +23,11 @@ class DiseaseModel:
     MANDATORY_FIELDS = []
     OPTIONAL_FIELDS  = []
 
-    def __init__(self, disease_name, learning_rate=0.05, n_iterations=2000):
+    def __init__(self, disease_name, learning_rate=0.05, n_iterations=3000, l2_lambda=0.01):
         self.disease_name    = disease_name
         self.model           = LogisticRegressionScratch(learning_rate=learning_rate,
-                                                         n_iterations=n_iterations)
+                                                         n_iterations=n_iterations,
+                                                         l2_lambda=l2_lambda)
         self.normalizer      = MinMaxNormalizer()
         self.feature_names   = []
         self.training_means  = {}
@@ -180,7 +181,7 @@ class AnemiaModel(DiseaseModel):
     OPTIONAL_FIELDS  = ["rbc", "mcv", "mch", "hematocrit", "ferritin"]
 
     def __init__(self):
-        super().__init__("Anemia", learning_rate=0.05, n_iterations=2000)
+        super().__init__("Anemia", learning_rate=0.05, n_iterations=3000, l2_lambda=0.005)
 
     def train_on_generated_data(self):
         X, y, feature_names = MedicalDataGenerator.generate_anemia_dataset(n_samples=2000)
@@ -253,7 +254,8 @@ class DiabetesModel(DiseaseModel):
     OPTIONAL_FIELDS  = ["hba1c", "bmi", "age", "insulin", "blood_pressure"]
 
     def __init__(self):
-        super().__init__("Diabetes", learning_rate=0.05, n_iterations=2000)
+        # Pima Indians is a moderately hard dataset — lower LR + more iterations + L2
+        super().__init__("Diabetes", learning_rate=0.03, n_iterations=5000, l2_lambda=0.01)
 
     def train_on_generated_data(self):
         X, y, feature_names = MedicalDataGenerator.generate_diabetes_dataset(n_samples=2000)
@@ -325,7 +327,7 @@ class InfectionModel(DiseaseModel):
     OPTIONAL_FIELDS  = ["neutrophils", "lymphocytes", "crp", "esr", "temperature"]
 
     def __init__(self):
-        super().__init__("Infection", learning_rate=0.05, n_iterations=2000)
+        super().__init__("Infection", learning_rate=0.05, n_iterations=3000, l2_lambda=0.005)
 
     def train_on_generated_data(self):
         X, y, feature_names = MedicalDataGenerator.generate_infection_dataset(n_samples=2000)
@@ -414,7 +416,7 @@ class CholesterolModel(DiseaseModel):
     OPTIONAL_FIELDS  = ["ldl", "hdl", "triglycerides", "vldl", "cholesterol_ratio"]
 
     def __init__(self):
-        super().__init__("Cholesterol", learning_rate=0.05, n_iterations=2000)
+        super().__init__("Cholesterol", learning_rate=0.04, n_iterations=4000, l2_lambda=0.01)
 
     def train_on_generated_data(self):
         X, y, feature_names = MedicalDataGenerator.generate_cholesterol_dataset(n_samples=2000)

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "anemia_severe_critical",
+    "disease": "anemia",
+    "clinical_scenario": "Severely low hemoglobin, generally below approximately 7 g/dL, with critically reduced RBC count and hematocrit, indicating severe anemia that may require urgent transfusion or emergency intervention regardless of the underlying cause.",
+    "recommendation": "This presentation indicates severe anemia requiring urgent medical evaluation. Immediate clinical assessment is needed to determine the underlying cause and whether transfusion or emergency stabilization is required before any outpatient workup.",
+    "diet_advice": "Dietary measures are secondary at this severity; focus on urgent medical stabilization first.",
+    "lifestyle_advice": "Avoid strenuous activity until hemoglobin is stabilized. Seek emergency care immediately if symptoms of severe anemia occur, such as chest pain, severe shortness of breath, or fainting.",
+    "suggested_follow_up_tests": ["Type and crossmatch", "Peripheral blood smear", "Reticulocyte count", "Ferritin and iron studies", "Stool occult blood test"],
+    "urgency_level": "Emergency",
+    "medical_keywords": ["severe anemia", "critical hemoglobin", "transfusion"],
+    "evidence_tags": ["WHO Anemia Classification 2011", "Kassebaum NJ et al., Hematol Oncol Clin North Am 2016"]
+  },
+  {
+    "id": "anemia_iron_deficiency_low_ferritin",
+    "disease": "anemia",
+    "clinical_scenario": "Low hemoglobin together with low ferritin, and typically low MCV and low MCH forming a microcytic, hypochromic pattern, is the classic laboratory signature of iron deficiency anemia. Low ferritin specifically indicates depleted iron stores, which distinguishes this pattern from other causes of anemia.",
+    "recommendation": "This pattern is consistent with iron deficiency anemia. Initiate iron repletion, using oral iron supplementation or IV iron if oral is not tolerated or malabsorption is suspected, and investigate the underlying cause of iron loss such as gastrointestinal blood loss or dietary insufficiency.",
+    "diet_advice": "Increase iron-rich foods such as red meat, liver, spinach, lentils, and beans, and pair them with Vitamin C sources such as citrus fruit or bell peppers to enhance non-heme iron absorption. Avoid tea or coffee immediately with iron-rich meals, as tannins inhibit absorption.",
+    "lifestyle_advice": "Take iron supplements on an empty stomach if tolerated for best absorption, and monitor for gastrointestinal side effects. Schedule a follow-up CBC and ferritin test in 4-6 weeks to confirm response to therapy.",
+    "suggested_follow_up_tests": ["Serum iron and TIBC / transferrin saturation", "Peripheral blood smear", "Stool occult blood test / GI evaluation if no obvious dietary cause"],
+    "urgency_level": "Soon",
+    "medical_keywords": ["low ferritin", "iron deficiency", "microcytic anemia", "iron stores depleted"],
+    "evidence_tags": ["Kassebaum NJ et al., Hematol Oncol Clin North Am 2016", "Camaschella C., NEJM 2015"]
+  },
+  {
+    "id": "anemia_normal_ferritin_further_workup",
+    "disease": "anemia",
+    "clinical_scenario": "Low hemoglobin but ferritin is within the normal range or elevated, not low. This rules out simple iron deficiency as the cause and instead suggests anemia of chronic disease, hemolysis, a bone marrow disorder, or B12/folate deficiency. Ferritin can also be elevated in inflammation, since it is an acute-phase reactant, which can mask a coexisting iron deficiency.",
+    "recommendation": "Do not start empiric iron supplementation based on low hemoglobin alone when ferritin is normal or high, since this pattern does not indicate iron deficiency. Refer for further hematologic workup to identify the underlying cause before treating.",
+    "diet_advice": "No specific iron-focused dietary change is indicated until the underlying cause is identified. Maintain a generally balanced diet.",
+    "lifestyle_advice": "Avoid self-treating with iron supplements, since this will not address the underlying cause and may complicate diagnosis, including iron overload risk if hemolysis or a chronic inflammatory condition is later confirmed.",
+    "suggested_follow_up_tests": ["Vitamin B12 and folate levels", "Reticulocyte count", "Peripheral blood smear", "LDH, haptoglobin, and indirect bilirubin for hemolysis workup", "CRP/ESR inflammation screen", "Thyroid function tests"],
+    "urgency_level": "Soon",
+    "medical_keywords": ["normal ferritin", "further workup", "anemia of chronic disease"],
+    "evidence_tags": ["Camaschella C., NEJM 2015", "Weiss G & Goodnough LT, NEJM 2005"]
+  },
+  {
+    "id": "anemia_macrocytic_b12_folate_pattern",
+    "disease": "anemia",
+    "clinical_scenario": "Low hemoglobin with an elevated MCV, forming a macrocytic pattern that suggests megaloblastic anemia due to Vitamin B12 or folate deficiency rather than iron deficiency, which classically presents with a low, not high, MCV.",
+    "recommendation": "This macrocytic pattern suggests Vitamin B12 or folate deficiency rather than iron deficiency. Test B12 and folate levels before supplementing, and investigate causes such as a vegetarian or vegan diet, pernicious anemia, or malabsorption.",
+    "diet_advice": "Increase B12-rich foods such as meat, eggs, dairy, and fortified cereals, and folate-rich foods such as leafy greens, legumes, and citrus, pending confirmatory labs.",
+    "lifestyle_advice": "If B12 deficiency is confirmed, discuss with a physician whether oral or intramuscular B12 replacement is appropriate, especially if malabsorption such as pernicious anemia is suspected.",
+    "suggested_follow_up_tests": ["Vitamin B12 level", "Serum/RBC folate level", "Intrinsic factor antibody / pernicious anemia workup", "Peripheral blood smear for hypersegmented neutrophils"],
+    "urgency_level": "Soon",
+    "medical_keywords": ["macrocytic anemia", "elevated corpuscular volume", "B12 deficiency", "folate deficiency"],
+    "evidence_tags": ["Green R et al., Nat Rev Dis Primers 2017"]
+  },
+  {
+    "id": "anemia_mild_borderline",
+    "disease": "anemia",
+    "clinical_scenario": "Mildly reduced hemoglobin, just below the normal range, without other markedly abnormal CBC indices. This borderline pattern may not yet require aggressive intervention but warrants monitoring.",
+    "recommendation": "Mild, borderline-low hemoglobin without other significantly abnormal indices can generally be monitored with lifestyle and dietary measures and a follow-up CBC, rather than immediate aggressive treatment.",
+    "diet_advice": "Include iron-rich and folate-rich foods as a general preventive measure, such as leafy greens, legumes, and lean meats.",
+    "lifestyle_advice": "Monitor hemoglobin levels regularly, roughly every 4-6 weeks, and reassess if levels continue to decline or symptoms develop.",
+    "suggested_follow_up_tests": ["Repeat CBC in 4-6 weeks", "Ferritin if the trend worsens"],
+    "urgency_level": "Monitor",
+    "medical_keywords": ["mild anemia", "low hemoglobin", "borderline hemoglobin"],
+    "evidence_tags": ["WHO Anemia Classification 2011"]
+  },
+  {
+    "id": "anemia_healthy_routine",
+    "disease": "anemia",
+    "clinical_scenario": "Hemoglobin, RBC, MCV, MCH, hematocrit, and ferritin are all within normal reference ranges, with no laboratory evidence of anemia or iron deficiency.",
+    "recommendation": "No anemia-related intervention is needed at this time. Continue routine health maintenance.",
+    "diet_advice": "Maintain a balanced diet with adequate iron, B12, and folate intake.",
+    "lifestyle_advice": "Continue routine annual health checkups and CBC screening as appropriate for age and risk factors.",
+    "suggested_follow_up_tests": ["Routine annual CBC screening"],
+    "urgency_level": "Routine",
+    "medical_keywords": ["normal CBC", "no anemia", "healthy screening"],
+    "evidence_tags": ["WHO Anemia Classification 2011"]
+  }
+]

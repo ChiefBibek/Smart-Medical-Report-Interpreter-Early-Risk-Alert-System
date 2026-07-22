@@ -138,7 +138,6 @@ class DiseaseModel:
         risk_level, risk_emoji = self._get_risk_level(probability)
         contributions = self._compute_contributions(norm_array, imputed_fields)
         explanation   = self._generate_explanation(contributions, imputed_fields, confidence)
-        recommendations = self._get_recommendations(risk_level, input_dict)
 
         return {
             "disease":          self.disease_name,
@@ -157,7 +156,6 @@ class DiseaseModel:
             "all_factors":   contributions,
             "explanation":   explanation,
             "alerts":          alerts,
-            "recommendations": recommendations,
             "disclaimer": ("This system is for awareness only and is not a replacement "
                            "for professional medical advice."),
         }
@@ -166,9 +164,6 @@ class DiseaseModel:
         raise NotImplementedError
 
     def _safety_override(self, input_dict, probability):
-        raise NotImplementedError
-
-    def _get_recommendations(self, risk_level, input_dict):
         raise NotImplementedError
 
 
@@ -227,23 +222,6 @@ class AnemiaModel(DiseaseModel):
     def predict(self, input_dict):
         return self._run_prediction(input_dict)
 
-    def _get_recommendations(self, risk_level, input_dict):
-        recs, hgb = [], input_dict.get("hemoglobin", 99)
-        if risk_level in ("High", "Moderate"):
-            recs.append("Increase iron-rich foods: red meat, spinach, lentils, beans")
-            recs.append("Take Vitamin C alongside iron sources to improve absorption")
-            recs.append("Consult a hematologist for complete blood panel evaluation")
-            if hgb < 10:
-                recs.append("🚨 Seek immediate attention — may require iron supplementation or transfusion")
-        elif risk_level == "Borderline":
-            recs.append("Monitor hemoglobin levels regularly (every 4–6 weeks)")
-            recs.append("Include folate-rich foods: leafy greens, citrus fruits")
-            recs.append("Schedule a follow-up CBC (complete blood count) test")
-        else:
-            recs.append("Maintain a balanced diet rich in iron and Vitamin B12")
-            recs.append("Continue routine annual health checkups")
-        return recs
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # DIABETES  — Mandatory: glucose | Optional: hba1c, bmi, age, insulin, blood_pressure
@@ -299,23 +277,6 @@ class DiabetesModel(DiseaseModel):
 
     def predict(self, input_dict):
         return self._run_prediction(input_dict)
-
-    def _get_recommendations(self, risk_level, input_dict):
-        recs, glucose = [], input_dict.get("glucose", 0)
-        if risk_level in ("High", "Moderate"):
-            recs.append("Significantly reduce sugar and refined carbohydrate intake")
-            recs.append("Aim for at least 150 minutes of moderate exercise per week")
-            recs.append("Consult an endocrinologist for a full diabetes evaluation")
-            if glucose > 200:
-                recs.append("🚨 Seek emergency care — blood glucose critically elevated")
-        elif risk_level == "Borderline":
-            recs.append("Adopt a low-glycemic index diet plan")
-            recs.append("Monitor fasting blood sugar daily if possible")
-            recs.append("Schedule an HbA1c test if not already available")
-        else:
-            recs.append("Maintain healthy weight and an active lifestyle")
-            recs.append("Annual fasting glucose screening is recommended")
-        return recs
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -389,23 +350,6 @@ class InfectionModel(DiseaseModel):
     def predict(self, input_dict):
         return self._run_prediction(input_dict)
 
-    def _get_recommendations(self, risk_level, input_dict):
-        recs, wbc = [], input_dict.get("wbc", 0)
-        if risk_level in ("High", "Moderate"):
-            recs.append("Seek immediate medical evaluation — do not delay")
-            recs.append("Request blood culture and sensitivity testing")
-            recs.append("Do not self-medicate with antibiotics without prescription")
-            if wbc > 20000:
-                recs.append("🚨 Emergency: Possible sepsis — go to hospital immediately")
-        elif risk_level == "Borderline":
-            recs.append("Monitor temperature and symptoms for 24–48 hours")
-            recs.append("Increase fluid intake and rest")
-            recs.append("Consult a doctor if fever persists beyond 48 hours")
-        else:
-            recs.append("Maintain good hygiene and balanced nutrition")
-            recs.append("Ensure vaccinations are up to date")
-        return recs
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHOLESTEROL  — Mandatory: total_cholesterol | Optional: ldl, hdl, triglycerides, vldl, cholesterol_ratio
@@ -421,12 +365,6 @@ class CholesterolModel(DiseaseModel):
     def train_on_generated_data(self):
         X, y, feature_names = MedicalDataGenerator.generate_cholesterol_dataset(n_samples=2000)
         return self.train(X, y, feature_names)
-
-    def _normalise_alias(self, input_dict):
-        if "cholesterol" in input_dict and "total_cholesterol" not in input_dict:
-            input_dict = dict(input_dict)
-            input_dict["total_cholesterol"] = input_dict.pop("cholesterol")
-        return input_dict
 
     def _safety_override(self, input_dict, probability):
         alerts, forced_high = [], False
@@ -474,27 +412,7 @@ class CholesterolModel(DiseaseModel):
         return probability, alerts
 
     def predict(self, input_dict):
-        input_dict = self._normalise_alias(input_dict)
+        # Alias resolution ("cholesterol" -> "total_cholesterol") now happens
+        # upstream in validation/preprocessing.py, before this model ever sees
+        # the input, so no local alias handling is needed here.
         return self._run_prediction(input_dict)
-
-    def _get_recommendations(self, risk_level, input_dict):
-        recs = []
-        hdl  = input_dict.get("hdl")
-        trig = input_dict.get("triglycerides")
-        if risk_level in ("High", "Moderate"):
-            recs.append("Adopt a heart-healthy diet: cut saturated fats, eliminate trans fats")
-            recs.append("Increase soluble fiber: oats, beans, lentils, fruits")
-            recs.append("Exercise at least 30 minutes daily")
-            recs.append("Consult a cardiologist for lipid-lowering therapy evaluation")
-            if hdl is not None and hdl < 40:
-                recs.append("Increase HDL naturally: exercise, quit smoking, healthy fats")
-            if trig is not None and trig > 200:
-                recs.append("Reduce alcohol and sugar intake to lower triglycerides")
-        elif risk_level == "Borderline":
-            recs.append("Reduce dietary cholesterol and saturated fats")
-            recs.append("Increase omega-3 intake: fish, flaxseed, walnuts")
-            recs.append("Recheck full lipid panel in 3 months")
-        else:
-            recs.append("Maintain healthy dietary habits and active lifestyle")
-            recs.append("Annual lipid profile screening recommended after age 35")
-        return recs

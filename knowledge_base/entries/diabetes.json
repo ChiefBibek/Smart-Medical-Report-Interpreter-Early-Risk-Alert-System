@@ -1,0 +1,74 @@
+[
+  {
+    "id": "diabetes_severe_critical",
+    "disease": "diabetes",
+    "clinical_scenario": "Very high fasting glucose, generally above approximately 300 mg/dL, possibly with elevated HbA1c, indicating a hyperglycemic emergency risk such as diabetic ketoacidosis or a hyperosmolar hyperglycemic state that requires urgent medical attention.",
+    "recommendation": "This glucose level indicates a possible hyperglycemic crisis. Seek emergency medical evaluation immediately rather than attempting outpatient management alone.",
+    "diet_advice": "Dietary changes are secondary; focus on urgent medical stabilization first.",
+    "lifestyle_advice": "Do not delay care. Go to an emergency department or urgent care immediately, especially if accompanied by nausea, vomiting, confusion, or rapid breathing.",
+    "suggested_follow_up_tests": ["Venous or arterial blood gas", "Serum ketones", "Electrolytes and renal function panel", "HbA1c"],
+    "urgency_level": "Emergency",
+    "medical_keywords": ["hyperglycemic crisis", "elevated glucose", "elevated hba1c", "diabetic emergency"],
+    "evidence_tags": ["ADA Standards of Medical Care in Diabetes 2023"]
+  },
+  {
+    "id": "diabetes_acute_stress_hyperglycemia",
+    "disease": "diabetes",
+    "clinical_scenario": "Elevated fasting glucose but HbA1c is within the normal or pre-diabetic range, not elevated to a degree consistent with sustained hyperglycemia. Since HbA1c reflects average glucose over roughly the preceding three months, an isolated high glucose reading with a normal HbA1c suggests acute stress hyperglycemia from illness, medication, or recent stress rather than established diabetes, and may also reflect a non-fasting sample or measurement error.",
+    "recommendation": "Do not diagnose diabetes based on a single elevated glucose reading when HbA1c is normal. This pattern is more consistent with acute or transient hyperglycemia than sustained diabetes. Confirm fasting status, consider repeat testing, and investigate acute precipitating factors such as illness, steroid use, or stress before starting long-term diabetes management.",
+    "diet_advice": "Reduce short-term sugar and refined carbohydrate intake pending confirmation, but avoid over-restrictive changes until a sustained diagnosis is confirmed.",
+    "lifestyle_advice": "Repeat fasting glucose testing on a separate day to confirm whether the elevation is persistent, and identify and address any acute illness, medication, or stress that may explain the isolated reading.",
+    "suggested_follow_up_tests": ["Repeat fasting glucose on a separate day", "Oral glucose tolerance test", "HbA1c if not already done", "Review of recent medications or illness"],
+    "urgency_level": "Soon",
+    "medical_keywords": ["normal HbA1c", "isolated high glucose", "stress hyperglycemia"],
+    "evidence_tags": ["ADA Standards of Medical Care in Diabetes 2023", "Sacks DB et al., Diabetes Care 2011"]
+  },
+  {
+    "id": "diabetes_sustained_poor_control",
+    "disease": "diabetes",
+    "clinical_scenario": "Both fasting glucose and HbA1c are elevated into the diabetic range, indicating sustained hyperglycemia over time rather than an isolated or acute reading. This combination confirms poorly controlled diabetes mellitus rather than a transient stress response.",
+    "recommendation": "This combination of elevated glucose and elevated HbA1c confirms sustained, poorly controlled diabetes. Initiate or intensify diabetes management with lifestyle and pharmacologic therapy as appropriate, and refer for endocrinology evaluation given the degree of control.",
+    "diet_advice": "Significantly reduce sugar and refined carbohydrate intake, and adopt a structured low-glycemic-index eating plan.",
+    "lifestyle_advice": "Aim for at least 150 minutes of moderate exercise per week, monitor blood glucose regularly, and discuss medication adjustment with an endocrinologist.",
+    "suggested_follow_up_tests": ["Repeat HbA1c in 3 months", "Lipid panel", "Renal function and urine microalbumin", "Dilated eye exam for diabetic retinopathy screening"],
+    "urgency_level": "Urgent",
+    "medical_keywords": ["elevated HbA1c", "elevated glucose", "diabetic range", "sustained hyperglycemia", "poor glycemic control"],
+    "evidence_tags": ["ADA Standards of Medical Care in Diabetes 2023"]
+  },
+  {
+    "id": "diabetes_prediabetic_borderline",
+    "disease": "diabetes",
+    "clinical_scenario": "Fasting glucose in the pre-diabetic range, roughly 100-125 mg/dL, with HbA1c, if available, also in the pre-diabetic range of 5.7-6.4%. This indicates impaired glucose regulation that has not yet progressed to overt diabetes.",
+    "recommendation": "This pattern indicates pre-diabetes. Lifestyle intervention at this stage can meaningfully reduce progression to type 2 diabetes; pharmacologic therapy is not usually first-line unless additional risk factors are present.",
+    "diet_advice": "Adopt a low-glycemic-index diet and reduce refined carbohydrate and sugary beverage intake.",
+    "lifestyle_advice": "Increase physical activity and aim for modest weight loss if overweight, and monitor fasting glucose periodically.",
+    "suggested_follow_up_tests": ["HbA1c if not already available", "Repeat fasting glucose in 6-12 months", "Lipid panel"],
+    "urgency_level": "Monitor",
+    "medical_keywords": ["pre-diabetes", "borderline glucose", "impaired fasting glucose"],
+    "evidence_tags": ["ADA Standards of Medical Care in Diabetes 2023"]
+  },
+  {
+    "id": "diabetes_obesity_metabolic_risk",
+    "disease": "diabetes",
+    "clinical_scenario": "Elevated glucose together with a significantly elevated BMI, generally above 35, suggesting that excess adiposity and insulin resistance are major contributors to the glycemic abnormality.",
+    "recommendation": "Given the significant obesity component, weight management should be a central part of management alongside glucose control, as meaningful weight loss can substantially improve insulin sensitivity.",
+    "diet_advice": "Adopt a calorie-appropriate, low-glycemic-index diet aimed at gradual, sustainable weight loss.",
+    "lifestyle_advice": "Pursue a structured weight-loss program combined with regular exercise, and consider referral to a dietitian or obesity-medicine specialist.",
+    "suggested_follow_up_tests": ["HbA1c", "Fasting insulin to assess insulin resistance", "Lipid panel", "Liver function tests to screen for fatty liver"],
+    "urgency_level": "Soon",
+    "medical_keywords": ["obesity", "high BMI", "insulin resistance"],
+    "evidence_tags": ["ADA Standards of Medical Care in Diabetes 2023"]
+  },
+  {
+    "id": "diabetes_healthy_routine",
+    "disease": "diabetes",
+    "clinical_scenario": "Fasting glucose, and HbA1c where available, are within normal reference ranges, with no laboratory evidence of diabetes or pre-diabetes.",
+    "recommendation": "No diabetes-related intervention is needed at this time. Continue routine screening given standard risk factors.",
+    "diet_advice": "Maintain a balanced diet and a healthy weight.",
+    "lifestyle_advice": "Continue regular physical activity. Annual fasting glucose screening is recommended, more frequently if risk factors are present.",
+    "suggested_follow_up_tests": ["Routine annual fasting glucose screening"],
+    "urgency_level": "Routine",
+    "medical_keywords": ["normal glucose", "normal hba1c", "no diabetes", "healthy screening"],
+    "evidence_tags": ["ADA Standards of Medical Care in Diabetes 2023"]
+  }
+]

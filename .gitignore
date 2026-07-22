@@ -205,3 +205,11 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Module 3: audit trail SQLite file + WAL sidecar files
+audit/decision_log.sqlite3
+audit/decision_log.sqlite3-wal
+audit/decision_log.sqlite3-shm
+
+# Module 2/3: cached Sentence-BERT embeddings for the knowledge base (rebuilt on first train_all())
+knowledge_base/cache/

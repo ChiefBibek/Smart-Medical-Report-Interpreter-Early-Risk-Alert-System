@@ -62,8 +62,59 @@ Generate risk assessment for a single patient.
     ],
     "alerts": ["Low hemoglobin detected", "Iron deficiency suspected"],
     "recommendations": ["Schedule tests...", "Increase iron intake..."],
-    "model_metrics": {"accuracy": 0.92, "f1_score": 0.89, "auc": 0.95}
+    "recommendation_detail": {
+        "recommendation": "...", "diet_advice": "...", "lifestyle_advice": "...",
+        "suggested_follow_up_tests": ["..."], "urgency_level": "Soon",
+        "primary_entry_id": "anemia_iron_deficiency_low_ferritin", "similarity_score": 0.62,
+        "match_confidence": "high", "is_fallback": false
+    },
+    "validation": {
+        "completeness_score": 100.0, "completeness_label": "Excellent",
+        "unit_conversions_applied": [], "consistency_warnings": [], "blocking_errors": [],
+        "suggested_tests": [], "adjusted_confidence": 87.0
+    },
+    "model_metrics": {"accuracy": 0.92, "f1_score": 0.89, "auc": 0.95},
+    "decision_id": 42
 }
+```
+
+Request fields may also include, per lab field: `<field>_unit` (explicit unit override),
+`<field>_ocr_confidence` (0-100), `<field>_confirmed` (bypass an impossible-value block), and a
+top-level optional `patient_history` object.
+
+If a submitted value is physiologically impossible (e.g. negative glucose), the model is never
+run and the response is a `validation_blocking` error instead — see the CDSS documentation in
+README.md for the exact shape.
+
+---
+
+### Decision Traceability (Module 3)
+
+**GET** `/decisions/{decision_id}`
+
+Returns the full logged record for a prior prediction: raw input, normalized input,
+validation warnings, prediction, SHAP explanation, matched knowledge-base entry + similarity
+score, the recommendation returned, and any doctor feedback. 404 if the id doesn't exist.
+
+**POST** `/decisions/{decision_id}/feedback`
+
+Records a doctor's correction or override against a prior decision.
+
+**Request Body:**
+```json
+{
+    "doctor_id": "dr_shrestha_01",
+    "doctor_modifications": {
+        "recommendation_overridden": true,
+        "corrected_recommendation": "..."
+    },
+    "notes": "Reviewed 2026-07-23"
+}
+```
+
+**Response:**
+```json
+{"decision_id": 42, "status": "updated"}
 ```
 
 ---

@@ -1,0 +1,74 @@
+[
+  {
+    "id": "infection_sepsis_critical",
+    "disease": "infection",
+    "clinical_scenario": "Very high WBC, above approximately 20,000 cells/uL, or very high CRP, combined with high fever, indicating a possible severe systemic infection or sepsis requiring urgent medical evaluation.",
+    "recommendation": "This combination of findings raises concern for sepsis or a severe systemic infection. Seek immediate medical evaluation; do not delay care or attempt self-treatment with over-the-counter or leftover antibiotics.",
+    "diet_advice": "Dietary measures are secondary; focus on urgent medical evaluation first.",
+    "lifestyle_advice": "Go to an emergency department immediately, especially if accompanied by confusion, low blood pressure, rapid heart rate, or difficulty breathing.",
+    "suggested_follow_up_tests": ["Blood cultures", "Lactate level", "Procalcitonin", "Comprehensive metabolic panel", "Chest imaging if respiratory symptoms present"],
+    "urgency_level": "Emergency",
+    "medical_keywords": ["sepsis", "severe infection", "very high WBC"],
+    "evidence_tags": ["Pierrakos C & Vincent JL, Critical Care 2010", "Wacker C et al., Lancet Infect Dis 2013"]
+  },
+  {
+    "id": "infection_bacterial_neutrophilic",
+    "disease": "infection",
+    "clinical_scenario": "Elevated WBC with a high neutrophil percentage, known as neutrophilia, and elevated CRP, a pattern classically associated with acute bacterial infection rather than a viral illness.",
+    "recommendation": "This neutrophil-predominant pattern with elevated inflammatory markers is consistent with a bacterial infection. Clinical correlation and consideration of antibiotic therapy, guided by a physician, is appropriate; avoid self-medicating with antibiotics without a prescription.",
+    "diet_advice": "Increase fluid intake and maintain adequate nutrition to support recovery.",
+    "lifestyle_advice": "Rest and monitor temperature. Request blood culture and sensitivity testing if symptoms are significant, to guide targeted antibiotic therapy.",
+    "suggested_follow_up_tests": ["Blood culture and sensitivity", "Site-specific culture such as urine, sputum, or wound as indicated", "Repeat CRP to track trend"],
+    "urgency_level": "Urgent",
+    "medical_keywords": ["neutrophilia", "bacterial infection", "elevated neutrophils", "elevated wbc"],
+    "evidence_tags": ["Pierrakos C & Vincent JL, Critical Care 2010"]
+  },
+  {
+    "id": "infection_viral_lymphocytic",
+    "disease": "infection",
+    "clinical_scenario": "WBC that is normal or mildly low, with low neutrophil percentage and relatively low lymphocyte percentage or lymphopenia, and CRP that is only mildly elevated, a pattern more suggestive of a viral infection than a bacterial one, since bacterial infections typically show more pronounced neutrophilia and higher CRP.",
+    "recommendation": "This pattern is more suggestive of a viral illness than a bacterial infection. Antibiotics are generally not indicated; supportive care and monitoring are appropriate, with follow-up if symptoms worsen or fail to improve within 48-72 hours.",
+    "diet_advice": "Increase fluid intake and rest, and maintain light, easily digestible nutrition.",
+    "lifestyle_advice": "Monitor temperature and symptoms for 24-48 hours. Avoid unnecessary antibiotic use, which is ineffective against viral infections and contributes to antibiotic resistance.",
+    "suggested_follow_up_tests": ["Viral panel or PCR if clinically indicated", "Repeat CBC if symptoms persist beyond 5-7 days"],
+    "urgency_level": "Monitor",
+    "medical_keywords": ["viral infection", "lymphopenia", "low neutrophil percentage"],
+    "evidence_tags": ["Pierrakos C & Vincent JL, Critical Care 2010"]
+  },
+  {
+    "id": "infection_mild_selflimited",
+    "disease": "infection",
+    "clinical_scenario": "Mildly elevated WBC or mildly elevated CRP with low-grade fever, above 38°C but below 39.5°C, without markedly abnormal neutrophil or lymphocyte percentages, suggesting a mild, likely self-limited infection.",
+    "recommendation": "This mild pattern is generally consistent with a self-limited infection. Supportive care with monitoring is reasonable; seek medical attention if fever persists beyond 48 hours or symptoms worsen.",
+    "diet_advice": "Increase fluid intake, with a light and nutritious diet to support immune function.",
+    "lifestyle_advice": "Rest and monitor temperature and symptoms, and use fever-reducing measures as needed and appropriate.",
+    "suggested_follow_up_tests": ["Repeat CBC or CRP if symptoms persist beyond 48-72 hours"],
+    "urgency_level": "Monitor",
+    "medical_keywords": ["mild infection", "low-grade fever", "self-limited"],
+    "evidence_tags": ["Mackowiak PA et al., JAMA 1992"]
+  },
+  {
+    "id": "infection_leukopenia_immune_compromise",
+    "disease": "infection",
+    "clinical_scenario": "Low WBC, below approximately 4,000 cells/uL and especially below 2,000, which can indicate immune compromise, bone marrow suppression, or certain viral infections, and paradoxically increases susceptibility to serious infection despite the low count.",
+    "recommendation": "Low WBC in the context of suspected infection is concerning, as it may indicate an impaired ability to fight infection. This warrants prompt medical evaluation rather than reassurance from an otherwise low count.",
+    "diet_advice": "Maintain good nutrition to support immune recovery, and avoid raw or undercooked foods if immune compromise is confirmed, to reduce infection risk.",
+    "lifestyle_advice": "Seek prompt medical evaluation, and practice strict hygiene and avoid exposure to sick contacts until the cause of the low WBC is identified.",
+    "suggested_follow_up_tests": ["Peripheral blood smear", "Bone marrow evaluation if persistent", "Review of medications for drug-induced neutropenia", "HIV or viral serologies if clinically indicated"],
+    "urgency_level": "Urgent",
+    "medical_keywords": ["leukopenia", "low WBC", "immune compromise"],
+    "evidence_tags": ["NHANES 2017-2020 CBC reference ranges"]
+  },
+  {
+    "id": "infection_healthy_routine",
+    "disease": "infection",
+    "clinical_scenario": "WBC, neutrophil percentage, lymphocyte percentage, CRP, ESR, and temperature are all within normal reference ranges, with no laboratory evidence of active infection.",
+    "recommendation": "No evidence of active infection. Continue routine health maintenance and standard hygiene practices.",
+    "diet_advice": "Maintain balanced nutrition to support normal immune function.",
+    "lifestyle_advice": "Maintain good hygiene practices and ensure vaccinations are up to date.",
+    "suggested_follow_up_tests": [],
+    "urgency_level": "Routine",
+    "medical_keywords": ["normal CBC", "no infection", "healthy screening"],
+    "evidence_tags": ["NHANES 2017-2020 CBC reference ranges"]
+  }
+]

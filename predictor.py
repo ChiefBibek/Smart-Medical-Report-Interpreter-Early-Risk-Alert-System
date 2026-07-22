@@ -31,6 +31,10 @@ import json, sys, os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from models.disease_models import AnemiaModel, DiabetesModel, InfectionModel, CholesterolModel
+from validation.engine import ValidationEngine
+from recommendation.context_builder import build_clinical_context
+from recommendation.retrieval_engine import RecommendationEngine
+from audit import db as audit_db
 
 FIELD_SCHEMA = {
     "anemia": {
@@ -88,6 +92,12 @@ class MedicalRiskPredictor:
         }
         self.training_metrics = {}
         self._trained = False
+        # Module 2/3: semantic recommendation engine (Sentence-BERT + knowledge base).
+        self.recommender = RecommendationEngine()
+        # Module 1: validation engine. Its "Suggested Additional Tests" reuses the same
+        # embedding/KB machinery as the recommender via dependency injection, so the two
+        # modules share one retrieval implementation instead of duplicating it.
+        self.validator = ValidationEngine(FIELD_SCHEMA, test_suggestion_client=self.recommender)
 
     def train_all(self, verbose=True):
         if verbose:
@@ -104,6 +114,12 @@ class MedicalRiskPredictor:
                 print(f"   ✅ Accuracy : {metrics['accuracy']*100:.2f}%")
                 print(f"   ✅ F1 Score : {metrics['f1_score']*100:.2f}%")
                 print(f"   ✅ AUC      : {metrics['auc']:.4f}")
+
+        if verbose:
+            print("\n🔬 Loading recommendation knowledge base + embedding model "
+                  "(all-MiniLM-L6-v2)...")
+        self.recommender.warmup()
+        audit_db.init_db()
 
         self._trained = True
         if verbose:
@@ -136,9 +152,58 @@ class MedicalRiskPredictor:
                 "supported_diseases": self.SUPPORTED_DISEASES,
             }
 
-        result = self.models[disease].predict(input_data)
-        if "error" not in result:
-            result["model_metrics"] = self.training_metrics.get(disease, {})
+        # --- Module 1: validate + normalize (units, physiological bounds, completeness,
+        # consistency) before the model ever sees the input. Impossible values (likely
+        # OCR/data-entry errors) short-circuit here; the model never runs on them.
+        validation_result = self.validator.validate(disease, input_data)
+        if validation_result.blocked:
+            return validation_result.to_blocking_error_dict()
+
+        result = self.models[disease].predict(validation_result.normalized_input)
+        if "error" in result:
+            return result  # e.g. missing mandatory fields — unchanged existing shape
+
+        # --- Module 2/3: semantic recommendation retrieval, replacing the old
+        # hardcoded per-disease recommendation lists.
+        field_labels = {**FIELD_SCHEMA[disease]["mandatory"], **FIELD_SCHEMA[disease]["optional"]}
+        context = build_clinical_context(
+            disease, result["risk_level"], result["risk_probability"],
+            result["top_factors"], result["all_factors"],
+            validation_result.normalized_input, result["fields_imputed"],
+            result["fields_missing_optional"], field_labels,
+            validation_result.adjusted_confidence,
+            validation_warnings=[w["message"] for w in validation_result.consistency_warnings],
+            completeness_label=validation_result.completeness_label,
+            patient_history=input_data.get("patient_history"),
+            alerts=result["alerts"],
+        )
+        rec = self.recommender.retrieve_recommendation(context, disease)
+
+        result["recommendations"] = [
+            rec["recommendation"],
+            f"Diet: {rec['diet_advice']}",
+            f"Lifestyle: {rec['lifestyle_advice']}",
+        ]
+        result["recommendation_detail"] = rec
+        result["prediction_confidence"] = validation_result.adjusted_confidence
+        result["validation"] = validation_result.to_public_dict()
+
+        # --- Module 3: traceability — log every decision for later audit/doctor feedback.
+        result["decision_id"] = audit_db.log_decision(
+            disease=disease,
+            raw_input=input_data,
+            normalized_input=validation_result.normalized_input,
+            validation_warnings=[w["message"] for w in validation_result.consistency_warnings],
+            completeness_score=validation_result.completeness_score,
+            prediction={"probability": result["risk_probability"], "risk_level": result["risk_level"],
+                        "alerts": result["alerts"]},
+            shap_explanation={"top_factors": result["top_factors"], "all_factors": result["all_factors"]},
+            matched_kb_entry_id=rec.get("primary_entry_id"),
+            similarity_score=rec.get("similarity_score"),
+            recommendation_returned=rec,
+        )
+
+        result["model_metrics"] = self.training_metrics.get(disease, {})
         return result
 
     def predict_batch(self, input_list):
@@ -193,6 +258,26 @@ def create_flask_app(predictor):
     def metrics():
         return jsonify(predictor.get_training_metrics())
 
+    @app.route("/decisions/<int:decision_id>", methods=["GET"])
+    def get_decision_route(decision_id):
+        """Module 3 traceability: fetch the full logged record for one prediction."""
+        record = audit_db.get_decision(decision_id)
+        if record is None:
+            return jsonify({"error": "decision not found", "decision_id": decision_id}), 404
+        return jsonify(record)
+
+    @app.route("/decisions/<int:decision_id>/feedback", methods=["POST"])
+    def submit_feedback_route(decision_id):
+        """Module 3 traceability: record a doctor's correction/override against a decision."""
+        try:
+            body = request.get_json() or {}
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
+        updated = audit_db.record_doctor_feedback(decision_id, body)
+        if not updated:
+            return jsonify({"error": "decision not found", "decision_id": decision_id}), 404
+        return jsonify({"decision_id": decision_id, "status": "updated"}), 200
+
     return app
 
 
@@ -246,7 +331,25 @@ def run_demo():
             "input": {"disease": "anemia", "hemoglobin": 14.5, "rbc": 4.9,
                       "mcv": 91, "mch": 30, "hematocrit": 44, "ferritin": 95}
         },
+        # Module 1: blocking validation error (physiologically impossible value)
+        {
+            "label": "Patient I — Diabetes (BLOCKING validation error: impossible negative glucose)",
+            "input": {"disease": "diabetes", "glucose": -50, "hba1c": 7.8, "bmi": 26}
+        },
+        # Module 2/3 discrimination pair — ferritin is the ONLY field that differs between J and K
+        {
+            "label": "Patient J — Anemia (low Hb + LOW ferritin → iron-deficiency pattern)",
+            "input": {"disease": "anemia", "hemoglobin": 9.0, "rbc": 3.6, "mcv": 68,
+                      "mch": 20, "hematocrit": 29, "ferritin": 5}
+        },
+        {
+            "label": "Patient K — Anemia (low Hb + NORMAL ferritin → further-workup pattern, NOT iron)",
+            "input": {"disease": "anemia", "hemoglobin": 9.0, "rbc": 3.6, "mcv": 68,
+                      "mch": 20, "hematocrit": 29, "ferritin": 120}
+        },
     ]
+
+    results_by_label = {}
 
     print("\n" + "=" * 65)
     print("  PREDICTION DEMO")
@@ -256,10 +359,16 @@ def run_demo():
         print(f"\n📋 {case['label']}")
         print("-" * 55)
         result = predictor.predict(case["input"])
+        results_by_label[case["label"]] = result
 
         if "error" in result:
-            print(f"  ❌ ERROR: {result['message']}")
-            print(f"     Mandatory fields required: {result['mandatory_fields']}")
+            if result.get("error_type") == "validation_blocking":
+                print(f"  🚫 BLOCKED: {result['message']}")
+                for be in result["blocking_errors"]:
+                    print(f"     - {be['field']}={be['value']}: {be['message']}")
+            else:
+                print(f"  ❌ ERROR: {result['message']}")
+                print(f"     Mandatory fields required: {result['mandatory_fields']}")
         else:
             conf_icon = "🟢" if result["prediction_confidence"] == 100 else "🟡"
             print(f"  Disease      : {result['disease']}")
@@ -278,6 +387,38 @@ def run_demo():
             for f in result["top_factors"]:
                 imp_tag = " [estimated]" if f["imputed"] else ""
                 print(f"    • {f['feature']}: {f['contribution']:.1f}%{imp_tag}")
+            if "validation" in result:
+                v = result["validation"]
+                print(f"  Validation   : completeness={v['completeness_score']}% ({v['completeness_label']})")
+                if v["unit_conversions_applied"]:
+                    print(f"                 unit conversions: {v['unit_conversions_applied']}")
+                if v["consistency_warnings"]:
+                    print(f"                 consistency warnings: {[w['message'] for w in v['consistency_warnings']]}")
+            if "recommendation_detail" in result:
+                rd = result["recommendation_detail"]
+                print(f"  Recommend    : [{rd['urgency_level']}] matched '{rd['primary_entry_id']}' "
+                      f"(similarity={rd['similarity_score']})")
+                for r in result["recommendations"]:
+                    print(f"    • {r}")
+            if "decision_id" in result:
+                print(f"  Decision ID  : {result['decision_id']}")
+
+    print("\n" + "=" * 65)
+    print("  FERRITIN DISCRIMINATION CHECK (Patient J vs Patient K)")
+    print("=" * 65)
+    r_j = results_by_label.get("Patient J — Anemia (low Hb + LOW ferritin → iron-deficiency pattern)")
+    r_k = results_by_label.get("Patient K — Anemia (low Hb + NORMAL ferritin → further-workup pattern, NOT iron)")
+    if r_j and r_k and "recommendation_detail" in r_j and "recommendation_detail" in r_k:
+        entry_j = r_j["recommendation_detail"]["primary_entry_id"]
+        entry_k = r_k["recommendation_detail"]["primary_entry_id"]
+        print(f"  J matched_scenario : {entry_j}")
+        print(f"  K matched_scenario : {entry_k}")
+        if entry_j != entry_k:
+            print("  Result: ✅ PASS — recommendation differs by ferritin (iron-deficiency vs. further-workup)")
+        else:
+            print("  Result: ❌ FAIL — identical recommendation despite differing ferritin")
+    else:
+        print("  Result: ⚠️  SKIPPED — one or both patients did not produce a recommendation_detail")
 
     print("\n" + "=" * 65)
     print("  SAMPLE JSON OUTPUT (mandatory-only anemia prediction)")

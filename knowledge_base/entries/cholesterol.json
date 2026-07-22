@@ -1,0 +1,74 @@
+[
+  {
+    "id": "cholesterol_severe_critical",
+    "disease": "cholesterol",
+    "clinical_scenario": "Very high total cholesterol, above approximately 320 mg/dL, or very high LDL, above 190 mg/dL, possibly suggesting familial hypercholesterolemia, or very high triglycerides above 500-1000 mg/dL which carries a risk of acute pancreatitis. This level of abnormality requires urgent specialist evaluation.",
+    "recommendation": "This degree of lipid abnormality requires urgent evaluation by a physician, and possibly a lipid specialist, given the risk of severe cardiovascular disease or, if triglycerides are markedly elevated, acute pancreatitis. Pharmacologic therapy is very likely indicated in addition to lifestyle changes.",
+    "diet_advice": "Immediately and significantly reduce saturated fat, trans fat, and, if triglycerides are markedly elevated, simple sugars and alcohol.",
+    "lifestyle_advice": "Seek urgent medical evaluation; do not wait for a routine follow-up given the severity of this result.",
+    "suggested_follow_up_tests": ["Genetic or family screening for familial hypercholesterolemia if LDL is markedly elevated", "Lipase and amylase if triglycerides are markedly elevated, to screen for pancreatitis", "Cardiology or lipid specialist referral"],
+    "urgency_level": "Urgent",
+    "medical_keywords": ["very high cholesterol", "familial hypercholesterolemia", "elevated ldl", "elevated cholesterol", "severe hypertriglyceridemia"],
+    "evidence_tags": ["ACC/AHA 2019 Guideline on the Primary Prevention of Cardiovascular Disease"]
+  },
+  {
+    "id": "cholesterol_isolated_high_ldl",
+    "disease": "cholesterol",
+    "clinical_scenario": "LDL cholesterol is elevated, generally above approximately 130-160 mg/dL, while HDL and triglycerides are relatively normal, indicating an LDL-predominant lipid abnormality, the pattern most directly linked to atherosclerotic cardiovascular risk.",
+    "recommendation": "This LDL-predominant pattern is a key driver of atherosclerotic cardiovascular disease risk. Focus management on LDL reduction through diet, and consider statin therapy per guideline risk assessment if lifestyle measures are insufficient.",
+    "diet_advice": "Reduce saturated and trans fat intake, and increase soluble fiber such as oats, beans, and lentils, along with plant sterols, which specifically help lower LDL.",
+    "lifestyle_advice": "Engage in regular aerobic exercise, and recheck the lipid panel in 6-12 weeks after dietary changes.",
+    "suggested_follow_up_tests": ["Repeat fasting lipid panel in 6-12 weeks", "Cardiovascular risk assessment such as an ASCVD risk score"],
+    "urgency_level": "Soon",
+    "medical_keywords": ["elevated LDL", "isolated LDL elevation", "atherosclerotic risk"],
+    "evidence_tags": ["ACC/AHA 2019 Guideline on the Primary Prevention of Cardiovascular Disease"]
+  },
+  {
+    "id": "cholesterol_isolated_high_triglycerides",
+    "disease": "cholesterol",
+    "clinical_scenario": "Triglycerides are elevated, generally above approximately 200 mg/dL, while LDL is relatively normal, indicating a triglyceride-predominant lipid abnormality, often associated with insulin resistance, excess alcohol intake, or high refined-carbohydrate diets.",
+    "recommendation": "This triglyceride-predominant pattern often responds well to reducing alcohol and refined carbohydrate or sugar intake and increasing omega-3 fatty acid intake, in addition to weight management if overweight.",
+    "diet_advice": "Reduce alcohol and added sugar intake, increase omega-3 intake through fatty fish, flaxseed, or walnuts, and limit refined carbohydrates.",
+    "lifestyle_advice": "Increase physical activity, and screen for and manage insulin resistance or undiagnosed diabetes, which commonly coexists with this pattern.",
+    "suggested_follow_up_tests": ["Fasting glucose or HbA1c to screen for insulin resistance", "Repeat fasting lipid panel in 6-12 weeks"],
+    "urgency_level": "Soon",
+    "medical_keywords": ["elevated triglycerides", "hypertriglyceridemia", "insulin resistance"],
+    "evidence_tags": ["ACC/AHA 2019 Guideline on the Primary Prevention of Cardiovascular Disease"]
+  },
+  {
+    "id": "cholesterol_low_hdl_predominant",
+    "disease": "cholesterol",
+    "clinical_scenario": "HDL cholesterol is low, generally below approximately 40 mg/dL, while LDL and triglycerides are not markedly abnormal, indicating a low-HDL-predominant pattern, which independently increases cardiovascular risk even when other lipid values appear acceptable.",
+    "recommendation": "Low HDL, even with otherwise acceptable LDL and triglycerides, is an independent cardiovascular risk factor. Focus on lifestyle measures known to raise HDL, since pharmacologic options for isolated low HDL are limited in effectiveness.",
+    "diet_advice": "Increase healthy unsaturated fats such as olive oil, nuts, and avocado, and reduce trans fats, which specifically lower HDL.",
+    "lifestyle_advice": "Regular aerobic exercise is one of the most effective ways to raise HDL naturally. Quit smoking, which lowers HDL.",
+    "suggested_follow_up_tests": ["Repeat fasting lipid panel in 3-6 months", "Assess for smoking and metabolic syndrome components"],
+    "urgency_level": "Monitor",
+    "medical_keywords": ["low HDL", "isolated low HDL"],
+    "evidence_tags": ["ACC/AHA 2019 Guideline on the Primary Prevention of Cardiovascular Disease"]
+  },
+  {
+    "id": "cholesterol_combined_dyslipidemia",
+    "disease": "cholesterol",
+    "clinical_scenario": "High LDL together with high triglycerides and low HDL simultaneously, a combined dyslipidemia pattern often associated with metabolic syndrome and carrying substantially higher cardiovascular risk than any single abnormality alone.",
+    "recommendation": "This combined pattern of high LDL, high triglycerides, and low HDL suggests metabolic syndrome and carries elevated cardiovascular risk. A comprehensive approach addressing diet, weight, exercise, and likely pharmacologic therapy is warranted, with referral to a cardiologist or lipid specialist.",
+    "diet_advice": "Undertake a comprehensive dietary overhaul: reduce saturated and trans fats, reduce refined carbohydrates and alcohol, and increase soluble fiber and omega-3 intake.",
+    "lifestyle_advice": "Pursue a structured weight loss and exercise program, quit smoking, and screen for and manage metabolic syndrome components such as blood pressure, waist circumference, and fasting glucose.",
+    "suggested_follow_up_tests": ["Fasting glucose or HbA1c", "Comprehensive metabolic panel", "Repeat full lipid panel in 6-12 weeks", "Cardiology or lipid specialist referral"],
+    "urgency_level": "Urgent",
+    "medical_keywords": ["combined dyslipidemia", "elevated ldl", "elevated triglycerides", "low hdl", "metabolic syndrome"],
+    "evidence_tags": ["ACC/AHA 2019 Guideline on the Primary Prevention of Cardiovascular Disease", "Grundy SM et al., Circulation 2005"]
+  },
+  {
+    "id": "cholesterol_healthy_routine",
+    "disease": "cholesterol",
+    "clinical_scenario": "Total cholesterol, LDL, HDL, and triglycerides, where available, are all within desirable reference ranges, with no laboratory evidence of dyslipidemia.",
+    "recommendation": "No lipid-lowering intervention is needed at this time. Continue routine annual lipid screening.",
+    "diet_advice": "Maintain a heart-healthy diet with balanced fats and adequate fiber.",
+    "lifestyle_advice": "Maintain regular physical activity and a healthy body weight.",
+    "suggested_follow_up_tests": ["Routine annual lipid panel, recommended after age 35"],
+    "urgency_level": "Routine",
+    "medical_keywords": ["normal cholesterol", "normal ldl", "healthy screening", "no dyslipidemia"],
+    "evidence_tags": ["ACC/AHA 2019 Guideline on the Primary Prevention of Cardiovascular Disease"]
+  }
+]
